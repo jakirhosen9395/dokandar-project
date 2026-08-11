@@ -1,0 +1,8 @@
+/bin/
+coverage.out
+*.out
+.env
+.DS_Store
+_stripped/
+_stripped/
+_stripped/

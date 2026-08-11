@@ -1,0 +1,66 @@
+# Redis 8 — single node, Docker Compose, password auth ON.
+#
+# HOW TO READ THIS FILE (Docker day 1):
+#   command:  = the arguments given to redis-server when the container starts.
+#               We turn on AOF persistence and require a password.
+#   ports:    = "HOST:CONTAINER" — this machine's 6379 -> Redis's default 6379.
+#   volumes:  = keep the append-only file on the HOST disk (survives `down -v`).
+#   healthcheck: PING must answer PONG before the container counts as ready.
+# Every ${...} value comes from the .env file next to this compose file.
+
+name: dki-redis
+
+services:
+  redis:
+    # Official Redis image; the live platform runs major version 8.
+    image: redis:${REDIS_VERSION:-8.8.0}
+    container_name: dki_redis
+    restart: unless-stopped
+    # Give the process 30s to shut down CLEANLY on stop/restart (default 10s
+    # SIGKILLs databases mid-write and causes 'unclean shutdown' recovery).
+    stop_grace_period: 30s
+
+    # Start redis-server with: persistence on, files in /data, password required,
+    # and a small memory cap so a runaway test can't eat the host.
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --dir
+      - /data
+      - --requirepass
+      - ${REDIS_PASSWORD:?empty password - run setup_env.sh first}
+      - --maxmemory
+      - ${REDIS_MAXMEMORY:-256mb}
+      - --maxmemory-policy
+      - allkeys-lru
+
+    # The healthcheck needs the password too — passed as an env var (see below).
+    environment:
+      REDIS_HC_PASS: ${REDIS_PASSWORD}
+
+    # Cap the container's RAM (redis itself is capped tighter by --maxmemory).
+    mem_limit: ${REDIS_MEM_LIMIT:-384m}
+
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+
+    # Bind mount: AOF + RDB files live on the host and survive container removal.
+    volumes:
+      - type: bind
+        source: ${DATA_ROOT:-/data/dki}/redis
+        target: /data
+        bind:
+          create_host_path: true
+
+    # Ready = an authenticated PING answers PONG.
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_HC_PASS\" --no-auth-warning ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+networks:
+  default:
+    name: dki_redis_net

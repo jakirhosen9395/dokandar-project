@@ -1,0 +1,290 @@
+# =============================================================================
+# DOKANDAR — DEVELOPMENT INFRASTRUCTURE (Docker Compose)  ·  TEMPORARY, NOT THE PRODUCTION PLATFORM
+# -----------------------------------------------------------------------------
+# Local backing-service substrate for building/testing the DOKANDAR business application BEFORE the
+# real Kubernetes platform (Phase 4) is built. See docs/adr/ADR-025 for the execution-order rationale.
+#
+# Service definitions are REUSED from the utilities reference repo (gitlab.com/learningdevopstools/
+# utilities — utility1/utility2, 03_docker_single) and the elastic-apm-stack repo; the DOKANDAR-specific
+# additions are: ONE shared network, Compose PROFILES, a Kafka Schema Registry, and named volumes
+# (PVC-mappable) instead of host bind mounts — all chosen to keep this Kubernetes-ready.
+#
+# K8s-readiness contract (no Docker-only assumptions):
+#   * config is env-only (.env)            -> ConfigMap
+#   * secrets are a separate file (.env.secrets, gitignored, generated) -> Secret
+#   * service-DNS hostnames only           -> Kubernetes Service names (postgres, kafka, redis, ...)
+#   * healthchecks                          -> readiness/liveness probes
+#   * named volumes                         -> PersistentVolumeClaims
+#   * images/ports/health/metrics/logging   -> unchanged across Docker and k8s
+#
+# Usage (config + secrets are two separate env files, on purpose):
+#   docker compose --env-file .env --env-file .env.secrets --profile core up -d
+# Profiles: core | search | storage | observability | all
+# =============================================================================
+name: dokandar-dev
+
+networks:
+  # BUSINESS plane — the application + business backing services, including OpenSearch (canonical search).
+  dokandar_dev:
+    name: dokandar_dev
+    driver: bridge
+  # OBSERVABILITY plane — Elastic APM internals (Elasticsearch + Kibana). Business services are NOT placed
+  # here, so they CANNOT reach the observability Elasticsearch — enforcing "business search = OpenSearch
+  # only; Elasticsearch = developer observability only" (ADR-026). Maps to a Kubernetes NetworkPolicy.
+  dokandar_obs:
+    name: dokandar_obs
+    driver: bridge
+
+volumes:
+  pg_data:
+  redis_data:
+  kafka_data:
+  rabbitmq_data:
+  opensearch_data:
+  rustfs_data:
+  apm_es_data:
+
+services:
+
+  # ---- PostgreSQL 18 (reused: utility1/01_PostgreSQL) — per-context relational store ----
+  postgres:
+    image: postgres:${POSTGRES_VERSION:-18}
+    container_name: dokandar_postgres
+    profiles: [core, all]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dokandar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env.secrets (run ./gen-secrets.sh)}
+      POSTGRES_DB: ${POSTGRES_DB:-dokandar}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports: ["${POSTGRES_PORT:-5432}:5432"]
+    volumes: ["pg_data:/var/lib/postgresql/data"]
+    networks: [dokandar_dev]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER:-dokandar}\" -d \"$${POSTGRES_DB:-dokandar}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  # ---- Redis 8 (reused: utility1/04_Redis) — cache ----
+  redis:
+    image: redis:${REDIS_VERSION:-8}
+    container_name: dokandar_redis
+    profiles: [core, all]
+    restart: unless-stopped
+    command: ["redis-server","--appendonly","yes","--dir","/data","--requirepass","${REDIS_PASSWORD:?set in .env.secrets}","--maxmemory","${REDIS_MAXMEMORY:-256mb}","--maxmemory-policy","allkeys-lru"]
+    environment:
+      REDIS_HC_PASS: ${REDIS_PASSWORD}
+    ports: ["${REDIS_PORT:-6379}:6379"]
+    volumes: ["redis_data:/data"]
+    networks: [dokandar_dev]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_HC_PASS\" --no-auth-warning ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ---- Apache Kafka 4.3 KRaft (reused: utility2/05_Kafka) — the R6 event spine ----
+  kafka:
+    image: apache/kafka:${KAFKA_VERSION:-4.3.0}
+    container_name: dokandar_kafka
+    profiles: [core, all]
+    hostname: kafka
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      CLUSTER_ID: ${KAFKA_CLUSTER_ID:-DokandarDevKafkaClusterXY}
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://${KAFKA_EXTERNAL_HOST:-localhost}:${KAFKA_EXTERNAL_PORT:-9092}
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
+    ports: ["${KAFKA_EXTERNAL_PORT:-9092}:9092"]
+    volumes: ["kafka_data:/var/lib/kafka/data"]
+    networks: [dokandar_dev]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 20s
+
+  # ---- Kafka UI (reused: utility2/05_Kafka) ----
+  kafka-ui:
+    image: ${KAFKA_UI_IMAGE:-provectuslabs/kafka-ui:v0.7.2}
+    container_name: dokandar_kafka_ui
+    profiles: [core, all]
+    restart: unless-stopped
+    depends_on:
+      kafka: {condition: service_healthy}
+    environment:
+      KAFKA_CLUSTERS_0_NAME: dokandar
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8080/apis/registry/v2
+      DYNAMIC_CONFIG_ENABLED: "true"
+    ports: ["${KAFKA_UI_PORT:-8081}:8080"]
+    networks: [dokandar_dev]
+
+  # ---- Schema Registry (EXTENSION — DOKANDAR R6 Published Language; Apicurio, Kafka-agnostic) ----
+  schema-registry:
+    image: apicurio/apicurio-registry-mem:${APICURIO_VERSION:-2.6.5.Final}
+    container_name: dokandar_schema_registry
+    profiles: [core, all]
+    restart: unless-stopped
+    environment:
+      QUARKUS_HTTP_PORT: 8080
+      REGISTRY_APIS_V2_DATE_FORMAT: "yyyy-MM-dd'T'HH:mm:ssZ"
+    ports: ["${SCHEMA_REGISTRY_PORT:-8082}:8080"]
+    networks: [dokandar_dev]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 20s
+
+  # ---- RabbitMQ 4 (reused: utility2/06_RabbitMQ) — intra-context queues ----
+  rabbitmq:
+    image: rabbitmq:${RABBITMQ_IMAGE_TAG:-4-management}
+    container_name: dokandar_rabbitmq
+    profiles: [core, all]
+    hostname: dokandar-rabbit
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-dokandar}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?set in .env.secrets}
+    ports: ["${RABBITMQ_AMQP_PORT:-5672}:5672", "${RABBITMQ_MGMT_PORT:-15672}:15672"]
+    volumes: ["rabbitmq_data:/var/lib/rabbitmq"]
+    networks: [dokandar_dev]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 25s
+
+  # ---- OpenSearch 2.x (EXTENSION — DOKANDAR standard is OpenSearch, NOT Elasticsearch) — search ----
+  opensearch:
+    image: opensearchproject/opensearch:${OPENSEARCH_VERSION:-2.17.1}
+    container_name: dokandar_opensearch
+    profiles: [search, all]
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      cluster.name: ${OPENSEARCH_CLUSTER_NAME:-dokandar}
+      node.name: dokandar-os
+      bootstrap.memory_lock: "true"
+      OPENSEARCH_JAVA_OPTS: -Xms${OPENSEARCH_HEAP:-512m} -Xmx${OPENSEARCH_HEAP:-512m}
+      # Dev substrate: security plugin disabled (plain HTTP). Production re-enables it on the k8s platform.
+      DISABLE_SECURITY_PLUGIN: "true"
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+    ulimits:
+      memlock: {soft: -1, hard: -1}
+      nofile: {soft: 65536, hard: 65536}
+    ports: ["${OPENSEARCH_HTTP_PORT:-9200}:9200"]
+    volumes: ["opensearch_data:/usr/share/opensearch/data"]
+    networks: [dokandar_dev]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health | grep -qE 'green|yellow'"]
+      interval: 10s
+      timeout: 5s
+      retries: 24
+      start_period: 40s
+
+  # ---- RustFS (reused: utility2/10_RustFS) — S3-compatible object storage (replaces MinIO) ----
+  rustfs:
+    image: ${RUSTFS_IMAGE:-rustfs/rustfs:1.0.0-beta.8}
+    container_name: dokandar_rustfs
+    profiles: [storage, all]
+    hostname: rustfs
+    restart: unless-stopped
+    environment:
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:?set in .env.secrets}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:?set in .env.secrets}
+      RUSTFS_CORS_ALLOWED_ORIGINS: "*"
+      RUSTFS_OBS_LOGGER_LEVEL: info
+      RUSTFS_OBS_LOG_DIRECTORY: /logs
+    ports: ["${RUSTFS_API_PORT:-9000}:9000", "${RUSTFS_CONSOLE_PORT:-9001}:9001"]
+    volumes:
+      - "rustfs_data:/data"
+      - "rustfs_data:/logs"
+    networks: [dokandar_dev]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # ---- Observability: Elastic APM stack (reused: github.com/jakirhosen9395/elastic-apm-stack) ----
+  # This Elasticsearch is for DEVELOPER OBSERVABILITY ONLY (traces/metrics/logs). It is NOT a business
+  # search engine — business search is OpenSearch (above). It lives on the isolated `dokandar_obs`
+  # network so no business service can reach it. See ADR-026.
+  apm-elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${APM_STACK_VERSION:-9.2.0}
+    container_name: dokandar_apm_es
+    profiles: [observability, all]
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms${APM_ES_HEAP:-512m} -Xmx${APM_ES_HEAP:-512m}
+      bootstrap.memory_lock: "true"
+    ulimits:
+      memlock: {soft: -1, hard: -1}
+      nofile: {soft: 65536, hard: 65536}
+    volumes: ["apm_es_data:/usr/share/elasticsearch/data"]
+    networks: [dokandar_obs]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health | grep -qE 'green|yellow'"]
+      interval: 10s
+      timeout: 5s
+      retries: 24
+      start_period: 40s
+
+  apm-server:
+    image: docker.elastic.co/apm/apm-server:${APM_STACK_VERSION:-9.2.0}
+    container_name: dokandar_apm_server
+    profiles: [observability, all]
+    restart: unless-stopped
+    depends_on:
+      apm-elasticsearch: {condition: service_healthy}
+    command: >
+      -e
+      -E apm-server.host=0.0.0.0:8200
+      -E output.elasticsearch.hosts=["apm-elasticsearch:9200"]
+      -E apm-server.auth.secret_token=${APM_SECRET_TOKEN:?set in .env.secrets}
+    ports: ["${APM_SERVER_PORT:-8200}:8200"]
+    # APM Server is the ONLY bridge: it ingests traces from business services (dokandar_dev) and writes
+    # them to the observability Elasticsearch (dokandar_obs). Services talk to apm-server, never to the
+    # observability Elasticsearch directly.
+    networks: [dokandar_dev, dokandar_obs]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8200/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 25s
+
+  apm-kibana:
+    image: docker.elastic.co/kibana/kibana:${APM_STACK_VERSION:-9.2.0}
+    container_name: dokandar_apm_kibana
+    profiles: [observability, all]
+    restart: unless-stopped
+    depends_on:
+      apm-elasticsearch: {condition: service_healthy}
+    environment:
+      ELASTICSEARCH_HOSTS: '["http://apm-elasticsearch:9200"]'
+    ports: ["${KIBANA_PORT:-5601}:5601"]
+    networks: [dokandar_obs]

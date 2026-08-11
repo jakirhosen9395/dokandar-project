@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "logistics-svc.fullname" . }}
+  labels: { app: logistics-svc, context: logistics }
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector: { matchLabels: { app: logistics-svc } }
+  template:
+    metadata:
+      labels: { app: logistics-svc, context: logistics }
+      annotations: { prometheus.io/scrape: "true", prometheus.io/port: "{{ .Values.service.metricsPort }}" }
+    spec:
+      containers:
+        - name: logistics-svc
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - { name: http, containerPort: {{ .Values.service.port }} }
+            - { name: metrics, containerPort: {{ .Values.service.metricsPort }} }
+          envFrom: [{ configMapRef: { name: {{ include "logistics-svc.fullname" . }}-config } }]
+          livenessProbe:  { httpGet: { path: {{ .Values.probes.liveness }},  port: http }, initialDelaySeconds: 10 }
+          readinessProbe: { httpGet: { path: {{ .Values.probes.readiness }}, port: http }, initialDelaySeconds: 5 }
+          startupProbe:   { httpGet: { path: {{ .Values.probes.startup }},   port: http }, failureThreshold: 30, periodSeconds: 2 }
+          resources: {{ toYaml .Values.resources | nindent 12 }}

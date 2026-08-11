@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# setup.sh — lifecycle wrapper (up | down | purge | status | restart | logs). See ../README.md.
+set -euo pipefail
+cd "$(dirname "$0")"
+step() { printf '\n\033[1;34m==>\033[0m \033[1m%s\033[0m\n' "$*"; }
+ok()   { printf '   \033[32m✓\033[0m %s\n' "$*"; }
+load_env() { [ -f .env ] || bash setup_env.sh; set -a; . ./.env; set +a; }
+wait_healthy() {
+  printf '   waiting for healthy'
+  for _ in $(seq 1 60); do
+    [ "$(docker inspect -f '{{.State.Health.Status}}' dki_schema_registry 2>/dev/null || true)" = healthy ] && { echo ' ✓'; return 0; }
+    printf '.'; sleep 3
+  done
+  echo; echo '   ! not healthy in time — check: bash setup.sh logs'; exit 1
+}
+summary() {
+  PUBLIC_IP="${SERVER_IP:-$(grep -sE '^SERVER_IP=' .env | cut -d= -f2)}"; PUBLIC_IP="${PUBLIC_IP:-127.0.0.1}"
+  step "Connection details (secrets live in .env, chmod 600)"
+  cat <<SUM
+  ============ Apicurio Schema Registry ${APICURIO_VERSION} (in-memory) ============
+  API (local)    : http://127.0.0.1:${APICURIO_PORT}/apis/registry/v2
+  API (PUBLIC)   : http://${PUBLIC_IP}:${APICURIO_PORT}/apis/registry/v2
+  Web UI (PUBLIC): http://${PUBLIC_IP}:${APICURIO_PORT}/ui/
+  Auth           : none (in-memory teaching build)
+  NOTE           : storage is IN-MEMORY — a restart clears every schema.
+  ==============================================================
+SUM
+}
+case "${1:-}" in
+  up)     load_env
+          step "docker compose up -d"; docker compose up -d
+          step "health"; wait_healthy
+          docker compose ps; summary ;;
+  down)   load_env; docker compose down; ok "container removed — data kept at ${DATA_ROOT:-/data/dki}/schema-registry" ;;
+  purge)  load_env; docker compose down -v || true; sudo rm -rf "${DATA_ROOT:-/data/dki}/schema-registry"; ok "container + data deleted" ;;
+  status) load_env; docker compose ps ;;
+  restart) load_env; docker compose restart; docker compose ps ;;
+  logs)   load_env; docker compose logs --tail=80 ;;
+  *) echo "Usage: bash setup.sh up|down|purge|status|restart|logs"; exit 2 ;;
+esac

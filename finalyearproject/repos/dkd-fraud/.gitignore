@@ -1,0 +1,1 @@
+.venv/\n__pycache__/\n*.pyc\n.coverage\n.pytest_cache/\n.mypy_cache/\n.ruff_cache/\ndist/\n*.egg-info/\n

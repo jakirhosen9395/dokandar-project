@@ -1,0 +1,54 @@
+# RabbitMQ 4 — single node, Docker Compose, with the Management web UI.
+#
+# HOW TO READ THIS FILE (Docker day 1):
+#   hostname:  = RabbitMQ stores its data under the NODE name (rabbit@<hostname>).
+#                A fixed hostname keeps the same data across container restarts.
+#   ports:     = TWO ports: 5672 = AMQP (apps talk here), 15672 = the web UI.
+#   environment: = the default user/password created on first start.
+#   healthcheck: = rabbitmq-diagnostics ping answers when the node is up.
+# Every ${...} value comes from the .env file next to this compose file.
+
+name: dki-rabbitmq
+
+services:
+  rabbitmq:
+    # The `-management` tag bundles the web UI plugin. The live platform runs 4.x.
+    image: rabbitmq:${RABBITMQ_IMAGE_TAG:-4.3.2-management}
+    container_name: dki_rabbitmq
+    restart: unless-stopped
+    # Give the process 30s to shut down CLEANLY on stop/restart (default 10s
+    # SIGKILLs databases mid-write and causes 'unclean shutdown' recovery).
+    stop_grace_period: 30s
+
+    # Fixed node name => stable data directory (rabbit@dki-rabbit).
+    hostname: dki-rabbit
+
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-dki}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?empty password - run setup_env.sh first}
+
+    # Cap the container's RAM (rabbit's own watermark stays inside this budget).
+    mem_limit: ${RABBITMQ_MEM_LIMIT:-512m}
+
+    ports:
+      - "${RABBITMQ_AMQP_PORT:-5672}:5672"
+      - "${RABBITMQ_MGMT_PORT:-15672}:15672"
+
+    # Bind mount: queues/exchanges/messages live on the host (survive `down -v`).
+    volumes:
+      - type: bind
+        source: ${DATA_ROOT:-/data/dki}/rabbitmq
+        target: /var/lib/rabbitmq
+        bind:
+          create_host_path: true
+
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 25s
+
+networks:
+  default:
+    name: dki_rabbitmq_net

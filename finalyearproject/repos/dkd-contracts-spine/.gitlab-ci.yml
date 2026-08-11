@@ -1,0 +1,18 @@
+# dkd-contracts-spine pipeline (Phase 1 / v1.0.0). Governance template + full contract validation
+# (10 contracts + freeze-lock integrity). Trace: ADR-016, ADR-017, ADR-018, ADR-021, R6.
+include:
+  - project: 'final-year-project3354127/dkd-platform-libs'
+    ref: main
+    file: '/ci/templates/governance.yml'
+
+stages: [governance, contracts]
+
+contracts:validate:
+  stage: contracts
+  image: python:3.12-slim
+  before_script:
+    - pip install --quiet --disable-pip-version-check pyyaml
+  script:
+    - python3 tools/validate_contracts.py
+  rules:
+    - when: always

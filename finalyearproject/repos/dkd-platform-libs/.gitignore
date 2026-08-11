@@ -1,0 +1,12 @@
+# Generated SDKs are committed; their build outputs are not.
+**/node_modules/
+**/dist/
+**/bin/
+**/obj/
+**/target/
+**/.gradle/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+package-lock.json

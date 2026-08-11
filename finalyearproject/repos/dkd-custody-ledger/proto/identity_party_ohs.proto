@@ -1,0 +1,37 @@
+// identity-party-ohs (api-registry.yaml, owner_ctx 1, root_id DID). The Party read model and the
+// ONLY PII resolver (R7). Concrete .proto signatures were NEEDS-INFO in the frozen spine; this is the
+// MVP surface (ResolveParty + GetKycTier). Additional ops (Authorize/IssueSigningCert) are Phase 2.
+syntax = "proto3";
+
+option csharp_namespace = "IdentitySvc.Grpc";
+package dokandar.identity.ohs.v1;
+option go_package = "gitlab.com/final-year-project3354127/custody-ledger-svc/internal/identityclient/pb";
+
+service IdentityPartyOhs {
+  // Resolve the canonical Party read model for a DID. As the sole PII resolver, this returns phone.
+  rpc ResolveParty (ResolvePartyRequest) returns (PartyReply);
+  // Lightweight KYC-tier lookup for authorization/gating by other contexts.
+  rpc GetKycTier (GetKycTierRequest) returns (KycTierReply);
+}
+
+message ResolvePartyRequest { string did = 1; }
+message GetKycTierRequest   { string did = 1; }
+
+message PartyReply {
+  bool   found         = 1;
+  string did           = 2;
+  string kyc_tier      = 3;   // UNVERIFIED|BASIC|FULL|BUSINESS
+  string status        = 4;   // ACTIVE|SUSPENDED|DELETED
+  string locale        = 5;
+  string phone         = 6;   // PII — resolved only via this OHS (R6/R7)
+  bool   kyc_submitted = 7;
+  string bin           = 8;
+  int64  created_at    = 9;
+  int64  updated_at    = 10;
+}
+
+message KycTierReply {
+  bool   found    = 1;
+  string did      = 2;
+  string kyc_tier = 3;
+}

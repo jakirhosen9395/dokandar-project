@@ -1,0 +1,32 @@
+# dkd-infra pipeline — shared governance (inherited) + Docker dev-infra validation.
+include:
+  - project: 'final-year-project3354127/dkd-platform-libs'
+    ref: main
+    file: '/ci/templates/governance.yml'
+
+stages: [governance, validate]
+
+# Compose well-formedness + structural invariants, incl. the ADR-026 search/observability isolation.
+dev-infra:compose-invariants:
+  stage: validate
+  image: python:3.13-slim
+  before_script:
+    - pip install --quiet --disable-pip-version-check pyyaml
+  script:
+    - python dev-infra/ci-check.py
+
+# Shell scripts must be sound (errors fail the build; style warnings do not).
+dev-infra:shellcheck:
+  stage: validate
+  image: koalaman/shellcheck-alpine:stable
+  script:
+    - shellcheck -S error dev-infra/gen-secrets.sh dev-infra/bootstrap/run.sh dev-infra/verify.sh
+
+# The bootstrap topic/queue lists must match the frozen contract counts (59 Kafka topics, 10 RabbitMQ queues).
+dev-infra:contract-counts:
+  stage: validate
+  image: alpine:3.20
+  script:
+    - 'topics=$(grep -c . dev-infra/bootstrap/topics.txt); test "$topics" -eq 59 || { echo "topics=$topics (want 59)"; exit 1; }'
+    - 'queues=$(grep -c . dev-infra/bootstrap/queues.txt); test "$queues" -eq 10 || { echo "queues=$queues (want 10)"; exit 1; }'
+    - echo "bootstrap lists match contract counts (59 topics, 10 queues)"

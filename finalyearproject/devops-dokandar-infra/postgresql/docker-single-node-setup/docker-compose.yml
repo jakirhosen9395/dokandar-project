@@ -1,0 +1,74 @@
+# PostgreSQL 18 — single node, Docker Compose.
+#
+# HOW TO READ THIS FILE (Docker day 1):
+#   services:  = the containers we want. Here just one, called "postgres".
+#   image:     = which software + version to run (pulled from Docker Hub).
+#   ports:     = "HOST:CONTAINER" — traffic to this machine's port 5432 goes
+#                to the container's 5432 (PostgreSQL's default port).
+#   volumes:   = keep the database files on the HOST disk (a "bind mount"),
+#                so your data SURVIVES `docker compose down -v`.
+#   healthcheck: = a command Docker runs repeatedly; when it succeeds the
+#                container is "healthy" and setup.sh knows it is ready.
+#   restart:   = start the container again if it crashes or the host reboots.
+# Every value in ${...} comes from the .env file next to this compose file.
+
+name: dki-postgresql
+
+services:
+  postgres:
+    # Official PostgreSQL image; version pinned in .env (matches the live platform: 18).
+    image: postgres:${POSTGRES_VERSION:-18.4}
+
+    # A fixed, recognizable container name (dki_ = dokandar-infra library).
+    container_name: dki_postgres
+
+    # Come back up after crashes and host reboots.
+    restart: unless-stopped
+    # Give the process 30s to shut down CLEANLY on stop/restart (default 10s
+    # SIGKILLs databases mid-write and causes 'unclean shutdown' recovery).
+    stop_grace_period: 30s
+
+    # The three standard variables the postgres image understands.
+    # They only take effect on FIRST start (when the data dir is empty).
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dki}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?empty password - run setup_env.sh first}
+      POSTGRES_DB: ${POSTGRES_DB:-dki}
+      # Store the cluster in a SUBdirectory of the mount (avoids ownership quirks).
+      PGDATA: /var/lib/postgresql/data/pgdata
+
+    # Publish on all interfaces (0.0.0.0) so it is reachable from OUTSIDE this machine.
+    # Cap the container's RAM so a runaway query can never take down the host.
+    mem_limit: ${POSTGRES_MEM_LIMIT:-1g}
+
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+
+    # Bind mount: the database lives on the host at ${DATA_ROOT}/postgresql.
+    # Deleting the container does NOT delete this directory.
+    volumes:
+      - type: bind
+        source: ${DATA_ROOT:-/data/dki}/postgresql
+        target: /var/lib/postgresql/data
+        bind:
+          create_host_path: true
+      # First-boot provisioning: every *.sh here runs ONCE when the data dir is
+      # empty. Ours creates the multiple databases listed in .env (see §multi-db).
+      - type: bind
+        source: ./initdb.d
+        target: /docker-entrypoint-initdb.d
+        bind:
+          create_host_path: true
+
+    # "Am I ready?" — pg_isready answers once the server accepts connections.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+# A private network just for this utility (isolates it from other compose projects).
+networks:
+  default:
+    name: dki_postgresql_net

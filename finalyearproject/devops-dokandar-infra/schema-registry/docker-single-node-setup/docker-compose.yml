@@ -1,0 +1,41 @@
+# Apicurio Schema Registry (in-memory) — single node, Docker Compose.
+#
+# HOW TO READ THIS FILE (Docker day 1):
+#   ONE service. The `-mem` image keeps everything IN MEMORY — restart = empty
+#   registry. That is deliberate for learning; the persistent variants (SQL/Kafka
+#   storage) belong to the cluster variants later.
+#   ports: this machine's 8081 -> the registry's 8080 (8080 here belongs to kafka-ui).
+# Every ${...} value comes from the .env file next to this compose file.
+
+name: dki-schema-registry
+
+services:
+  schema-registry:
+    # Apicurio registry, in-memory storage. Same version the DOKANDAR platform pinned.
+    image: apicurio/apicurio-registry-mem:${APICURIO_VERSION:-2.6.5.Final}
+    container_name: dki_schema_registry
+    restart: unless-stopped
+    # Give the process 30s to shut down CLEANLY on stop/restart (default 10s
+    # SIGKILLs databases mid-write and causes 'unclean shutdown' recovery).
+    stop_grace_period: 30s
+
+    # A JVM app — cap both its heap (via JAVA_OPTS) and the container RAM.
+    environment:
+      JAVA_OPTS: ${APICURIO_JAVA_OPTS:-"-Xms128m -Xmx384m"}
+    mem_limit: ${APICURIO_MEM_LIMIT:-768m}
+
+    ports:
+      - "${APICURIO_PORT:-8081}:8080"
+
+    # NOTE: no volume — the -mem image stores nothing on disk (by design).
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+networks:
+  default:
+    name: dki_schema_registry_net

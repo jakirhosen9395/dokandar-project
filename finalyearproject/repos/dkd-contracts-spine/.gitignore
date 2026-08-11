@@ -1,0 +1,10 @@
+# Node/TS
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.npm/
+.idea/
+.vscode/
+.env

@@ -1,0 +1,5 @@
+_stripped/
+node_modules/
+dist/
+sdk/dist/
+sdk/node_modules/

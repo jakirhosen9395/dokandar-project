@@ -1,0 +1,141 @@
+{
+  "spec": "CustodyHash Specification v2 (DM §2, RFC-8785 subset R1-R9)",
+  "oracle": "sdk/testvectors/gen_vectors.py == custody-ledger canonical.go",
+  "note": "Every SDK MUST reproduce canonical (UTF-8 bytes) AND digest for each vector.",
+  "vectors": [
+    {
+      "name": "TV-01-genesis",
+      "note": "DM §5 worked example — CustodyInitialized genesis, previousHash='' included",
+      "fields": {
+        "ppid": "PP-01JABCDEF",
+        "gpid": "GP-rice-01JABCDEF",
+        "holder": "did:dokandar:01JABCDEF",
+        "holderRole": "PRODUCER",
+        "quantity": 5000,
+        "unit": "kg",
+        "producedAt": 1750000000000,
+        "initializedAt": 1750000001000,
+        "previousHash": ""
+      },
+      "canonical": "{\"gpid\":\"GP-rice-01JABCDEF\",\"holder\":\"did:dokandar:01JABCDEF\",\"holderRole\":\"PRODUCER\",\"initializedAt\":1750000001000,\"ppid\":\"PP-01JABCDEF\",\"previousHash\":\"\",\"producedAt\":1750000000000,\"quantity\":5000,\"unit\":\"kg\"}",
+      "digest": "ac543fecee75695fb2b1922ea9e0830f4bddb6ef1ad17e80f278d6171cbe0597"
+    },
+    {
+      "name": "TV-02-eventHash-excluded",
+      "note": "eventHash present in input is UNCONDITIONALLY excluded — same digest as TV-01",
+      "fields": {
+        "ppid": "PP-01JABCDEF",
+        "gpid": "GP-rice-01JABCDEF",
+        "holder": "did:dokandar:01JABCDEF",
+        "holderRole": "PRODUCER",
+        "quantity": 5000,
+        "unit": "kg",
+        "producedAt": 1750000000000,
+        "initializedAt": 1750000001000,
+        "previousHash": "",
+        "eventHash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      },
+      "canonical": "{\"gpid\":\"GP-rice-01JABCDEF\",\"holder\":\"did:dokandar:01JABCDEF\",\"holderRole\":\"PRODUCER\",\"initializedAt\":1750000001000,\"ppid\":\"PP-01JABCDEF\",\"previousHash\":\"\",\"producedAt\":1750000000000,\"quantity\":5000,\"unit\":\"kg\"}",
+      "digest": "ac543fecee75695fb2b1922ea9e0830f4bddb6ef1ad17e80f278d6171cbe0597"
+    },
+    {
+      "name": "TV-03-null-omission",
+      "note": "R2 — null members omitted; identical to a payload without them",
+      "fields": {
+        "ppid": "PP-XYZ",
+        "quantity": 10,
+        "previousHash": "abc",
+        "optionalNote": null,
+        "anotherNull": null
+      },
+      "canonical": "{\"ppid\":\"PP-XYZ\",\"previousHash\":\"abc\",\"quantity\":10}",
+      "digest": "2038cd01eb03eef9e9885912bce2b9f48bb37cade73e80b540d71c8109555e96"
+    },
+    {
+      "name": "TV-04-string-R5-unicode",
+      "note": "R5 — Bangla, <, >, &, quote, backslash, control chars; no \\uXXXX for >=U+0080",
+      "fields": {
+        "ppid": "PP-বাংলা",
+        "label": "a<b>c&d\"e\\f",
+        "ctrl": "line1\nline2\ttab",
+        "emoji": "🌾",
+        "previousHash": ""
+      },
+      "canonical": "{\"ctrl\":\"line1\\nline2\\ttab\",\"emoji\":\"🌾\",\"label\":\"a<b>c&d\\\"e\\\\f\",\"ppid\":\"PP-বাংলা\",\"previousHash\":\"\"}",
+      "digest": "2feda014115b350c68bed4c3f61238c7df0451b3b78ac6087257b902ab7b5c3b"
+    },
+    {
+      "name": "TV-05-nested-sorting-R3-R9",
+      "note": "R3/R9 — keys sorted at every depth; R8 arrays NOT sorted",
+      "fields": {
+        "zeta": 1,
+        "alpha": {
+          "z": 3,
+          "a": 2,
+          "m": {
+            "y": 1,
+            "b": 2
+          }
+        },
+        "list": [
+          3,
+          1,
+          2,
+          {
+            "k": "v",
+            "a": "z"
+          }
+        ],
+        "previousHash": ""
+      },
+      "canonical": "{\"alpha\":{\"a\":2,\"m\":{\"b\":2,\"y\":1},\"z\":3},\"list\":[3,1,2,{\"a\":\"z\",\"k\":\"v\"}],\"previousHash\":\"\",\"zeta\":1}",
+      "digest": "564f6f344b5a33543985a3314d240f3e6729c8f231076207a0aca6415c1edd53"
+    },
+    {
+      "name": "TV-06-int-bool-R6-R7",
+      "note": "R6 bare int64 (incl. large + negative + zero), R7 lowercase bool",
+      "fields": {
+        "big": 9007199254740992,
+        "neg": -42,
+        "zero": 0,
+        "flagT": true,
+        "flagF": false,
+        "previousHash": ""
+      },
+      "canonical": "{\"big\":9007199254740992,\"flagF\":false,\"flagT\":true,\"neg\":-42,\"previousHash\":\"\",\"zero\":0}",
+      "digest": "e15d636e41dc5b5db42dcb7f1d8455ba6253f41a2bcf12b5893a834da9d505fb"
+    },
+    {
+      "name": "TV-07-transfer",
+      "note": "CustodyTransferred with a non-empty previousHash (chain continuation)",
+      "fields": {
+        "ppid": "PP-01JABCDEF",
+        "fromHolder": "did:dokandar:AAA",
+        "toHolder": "did:dokandar:BBB",
+        "quantity": 5000,
+        "unit": "kg",
+        "transferredAt": 1750000002000,
+        "previousHash": "ac543fecee75695fb2b1922ea9e0830f4bddb6ef1ad17e80f278d6171cbe0597"
+      },
+      "canonical": "{\"fromHolder\":\"did:dokandar:AAA\",\"ppid\":\"PP-01JABCDEF\",\"previousHash\":\"ac543fecee75695fb2b1922ea9e0830f4bddb6ef1ad17e80f278d6171cbe0597\",\"quantity\":5000,\"toHolder\":\"did:dokandar:BBB\",\"transferredAt\":1750000002000,\"unit\":\"kg\"}",
+      "digest": "4ee2ed980a6f4fb90a68e1a73d15f5c5ae1d65931679034dc6df8602873ed59c"
+    },
+    {
+      "name": "TV-08-recalled-no-previousHash",
+      "note": "§6 — ProductRecalled keyed by recallId, NOT chained, has NO previousHash field",
+      "fields": {
+        "recallId": "RECALL-01JXYZ",
+        "gpid": "GP-rice-01JABCDEF",
+        "reason": "contamination",
+        "issuedBy": "did:dokandar:REGULATOR",
+        "affectedPpids": [
+          "PP-01JABCDEF",
+          "PP-01JABCDEG"
+        ],
+        "recalledAt": 1750000003000
+      },
+      "canonical": "{\"affectedPpids\":[\"PP-01JABCDEF\",\"PP-01JABCDEG\"],\"gpid\":\"GP-rice-01JABCDEF\",\"issuedBy\":\"did:dokandar:REGULATOR\",\"reason\":\"contamination\",\"recallId\":\"RECALL-01JXYZ\",\"recalledAt\":1750000003000}",
+      "digest": "5f2e4e2c854f2449c9d78526a2c73956d9208294ebd86645956004ebec244c1f"
+    }
+  ]
+}

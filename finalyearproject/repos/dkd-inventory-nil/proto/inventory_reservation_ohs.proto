@@ -1,0 +1,14 @@
+// inventory-reservation-ohs (B2B-F2 / EF-API-1 internal plane). gRPC surface for the G2
+// strong-local reserve/transition writes other contexts (B2B) use instead of REST.
+syntax = "proto3";
+package dokandar.inventory.ohs.v1;
+option go_package = "gitlab.com/final-year-project3354127/inventory-svc/internal/reservationohs/pb";
+
+service InventoryReservationOhs {
+  rpc Reserve    (ReserveRequest)    returns (ReserveReply);
+  rpc Transition (TransitionRequest) returns (TransitionReply); // release | confirm
+}
+message ReserveRequest    { string idempotency_key = 1; string gpid = 2; string holder = 3; int64 quantity = 4; }
+message ReserveReply      { bool ok = 1; string res_id = 2; bool insufficient_stock = 3; }
+message TransitionRequest { string res_id = 1; string to = 2; } // RELEASED | CONFIRMED
+message TransitionReply   { bool ok = 1; bool not_found = 2; string state = 3; }

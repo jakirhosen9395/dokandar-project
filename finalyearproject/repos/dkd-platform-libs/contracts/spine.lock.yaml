@@ -1,0 +1,17 @@
+# Contract Freeze Manifest — pins dkd-contracts-spine at v1.0.0. The validator recomputes each
+# sha256 and FAILS on drift (Contract Freeze integrity). Member contracts keep independent semvers;
+# the SPINE COMPOSITION is frozen at version 1.0.0.
+version: 1.0.0
+frozen_at: "2026-06-29"
+note: "messaging/data-stores/enum are verbatim transcriptions of frozen canon (own 0.1.0 lifecycle); the 7 derived registries are 1.0.0. The spine bundle is frozen at 1.0.0."
+contracts:
+  - { file: messaging.yaml, version: 0.1.0, sha256: d24d8862084587ab7e6f47deba7de3b6ba1331cc06ccb52c787cb1722dbd31de }
+  - { file: data-stores.yaml, version: 0.1.0, sha256: 6cb13763bf0b51b027820e1926573a1b133c8443f87bb76061f5ba95e4fa1750 }
+  - { file: enum-registry.md, version: 0.1.0, sha256: adb7e771662c7ea7e3ff6022b8c9bef985126effa29ad5e97b50352634c60dc9 }
+  - { file: ids.yaml, version: 1.0.0, sha256: c83a800e52f99d0147a23e9a5a68b47be0a06524ea3db70247dd37fc0bcec4d4 }
+  - { file: api-registry.yaml, version: 1.0.0, sha256: eea7626d292381d15fae0f5c1db4f7a25770a1e5ad86db68281410bda7f9701f }
+  - { file: schema-registry.yaml, version: 1.0.0, sha256: eff4e4f067502a801738f9515844cb88de32d3e96a89d8f44edf66ab3db0a087 }
+  - { file: permissions.yaml, version: 1.0.0, sha256: 1a06922938b0a7f9d6fce401426d4e7542f10d8e2bea7e63f6e77ec99dbf0afc }
+  - { file: configuration.yaml, version: 1.0.0, sha256: da594670227e1afff98dfa4a157943ab0bcceb3ee2fbc2ed2cd21e3b6aba415c }
+  - { file: error-codes.yaml, version: 1.0.0, sha256: 17e0f0fe9dee9cc6087eded3f043e02ff3883104a7a44af84343e867cab700d8 }
+  - { file: glossary.yaml, version: 1.0.0, sha256: 77ffd2154f5a4220d7bfddb1f71b3d162c3c5c4994424f5c5f9535812919d430 }

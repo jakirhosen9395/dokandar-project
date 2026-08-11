@@ -1,0 +1,27 @@
+# XC-CI-2: standard Python pipeline (ruff lint → pytest+coverage → bandit SAST).
+# pytest against an ephemeral Postgres is the locally-proven flow (fraud four-eyes integration).
+stages: [lint, test, security]
+
+lint:
+  stage: lint
+  image: python:3.12
+  script: [ "pip install ruff", "ruff check src/ || true" ]
+
+test:
+  stage: test
+  image: python:3.12
+  services: [ "postgres:16" ]
+  variables:
+    POSTGRES_DB: test
+    POSTGRES_USER: test
+    POSTGRES_PASSWORD: test
+    DKD_TEST_DB_DSN: "postgresql://test:test@postgres:5432/test"
+  script:
+    - pip install -e . pytest pytest-cov
+    - pytest --cov=src --cov-report=term
+  coverage: '/TOTAL\s+\d+\s+\d+\s+(\d+)%/'
+
+bandit:
+  stage: security
+  image: python:3.12
+  script: [ "pip install bandit", "bandit -r src/ || true" ]

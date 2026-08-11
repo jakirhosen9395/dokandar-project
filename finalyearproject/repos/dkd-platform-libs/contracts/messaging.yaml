@@ -1,0 +1,112 @@
+# Canonical messaging registry — BOTH buses. Transcribed verbatim from the frozen
+# Domain-Model Kafka Event Catalog (59 topics) and RabbitMQ Intra-Context Queues (10).
+# Machine-artifact (Header Profile per ADR-021); governed by dkd-contracts-spine/README.md.
+# Canonical vocabulary per ADR-016 (Domain-Model wins; SA variants PaymentSettled/parcel/EscrowHeld
+# are errata, NOT used here). Count is DERIVED and gated on invariants, not a frozen literal.
+header:
+  id: messaging-registry
+  title: DOKANDAR Messaging Registry (Kafka spine + RabbitMQ intra-context)
+  layer: L2
+  taxonomy: T7
+  doc_class: contracts
+  owner: event-spine-published-language-board
+  classification: Internal
+  status: Draft
+  version: 0.1.0
+  trace: [DM§"Kafka Event Catalog", DM§"RabbitMQ Intra-Context Queues", R1, R6, ADR-016]
+  last_verified: { date: 2026-06-28, source_commit: PENDING }
+  source: DOKANDAR-Domain-Model.md lines 1024-1107
+
+# Context numbers: 1 Identity 2 Catalog 3 Custody 4 Provenance 5 Inventory 6 B2C
+# 7 B2B 8 Finance 9 Logistics 10 Fraud 11 Government 12 Analytics 13 Platform
+buses:
+  kafka:
+    role: cross-context Published Language (R6); the ONLY legal cross-context channel
+    naming: "<context>.<aggregate>.<EventName>.v<N>"
+    invariants: [exactly-one-producer-per-topic (R1), no-produced-topic-outside-registry, payloads-canonical-IDs-only-no-PII]
+    topic_count_baseline: 59
+    topics:
+      # --- Identity (#1) ---
+      - { topic: identity.party.PartyRegistered.v1, producer: 1, key: DID, consumers: [8,13] }
+      - { topic: identity.party.KYCApproved.v1, producer: 1, key: DID, consumers: [6,7,10,11] }
+      - { topic: identity.party.KYCTierChanged.v1, producer: 1, key: DID, consumers: [6,7,10,11] }
+      - { topic: identity.party.KYCRejected.v1, producer: 1, key: DID, consumers: [13] }
+      - { topic: identity.party.PartySuspended.v1, producer: 1, key: DID, consumers: [6,7,8,10,11] }
+      - { topic: identity.party.PartyReactivated.v1, producer: 1, key: DID, consumers: [6,7,8] }
+      # --- Catalog (#2) ---
+      - { topic: catalog.product.ProductCreated.v1, producer: 2, key: GPID, consumers: [12] }
+      - { topic: catalog.product.ProductPublished.v1, producer: 2, key: GPID, consumers: [6,12] }
+      - { topic: catalog.product.ProductDeprecated.v1, producer: 2, key: GPID, consumers: [5,6,7,12] }
+      - { topic: catalog.product.ProductPriceRuleAdded.v1, producer: 2, key: GPID, consumers: [6,12] }
+      - { topic: catalog.product.ProductMasterDataUpdated.v1, producer: 2, key: GPID, consumers: [12] }
+      # --- Custody (#3) — SOLE WRITER (R1) ---
+      - { topic: custody.passport.CustodyInitialized.v1, producer: 3, key: PPID, consumers: [2,4,5,11,12] }
+      - { topic: custody.passport.CustodyTransferred.v1, producer: 3, key: PPID, consumers: [2,4,5,8,11,12] }
+      - { topic: custody.passport.CustodySplit.v1, producer: 3, key: parentPpid, consumers: [2,4,5,12] }
+      - { topic: custody.passport.CustodyMerged.v1, producer: 3, key: newPpid, consumers: [2,4,5,12] }
+      - { topic: custody.passport.ProductRecalled.v1, producer: 3, key: recallId, consumers: [2,4,5,6,7,11,12] }
+      - { topic: custody.passport.CustodialSigned.v1, producer: 3, key: PPID, consumers: [4,12] }
+      # --- B2C (#6) ---
+      - { topic: b2c.order.OrderPlaced.v1, producer: 6, key: ORD, consumers: [8,9,10,11,12] }
+      - { topic: b2c.order.PaymentConfirmed.v1, producer: 6, key: ORD, consumers: [12] }
+      - { topic: b2c.order.OrderProcessingStarted.v1, producer: 6, key: ORD, consumers: [9,12] }
+      - { topic: b2c.order.OrderShipped.v1, producer: 6, key: ORD, consumers: [12] }
+      - { topic: b2c.order.OrderDelivered.v1, producer: 6, key: ORD, consumers: [8,12] }
+      - { topic: b2c.order.OrderCancelled.v1, producer: 6, key: ORD, consumers: [8,9,12] }
+      - { topic: b2c.order.OrderRefunded.v1, producer: 6, key: ORD, consumers: [12] }
+      # --- B2B (#7) ---
+      - { topic: b2b.tradeorder.TradeOrderCreated.v1, producer: 7, key: TRD, consumers: [8,10,11,12] }
+      - { topic: b2b.tradeorder.MarginPosted.v1, producer: 7, key: TRD, consumers: [8,12] }
+      - { topic: b2b.tradeorder.TradeActivated.v1, producer: 7, key: TRD, consumers: [8,12] }
+      - { topic: b2b.tradeorder.SettlementInitiated.v1, producer: 7, key: TRD, consumers: [8,12] }
+      - { topic: b2b.tradeorder.TradeSettled.v1, producer: 7, key: TRD, consumers: [11,12] }
+      - { topic: b2b.tradeorder.TradeDisputed.v1, producer: 7, key: TRD, consumers: [8,11,12] }
+      - { topic: b2b.tradeorder.TradeCancelled.v1, producer: 7, key: TRD, consumers: [8,12] }
+      # --- Finance (#8) — ISOLATED (R2) ---
+      - { topic: finance.wallet.WalletCreated.v1, producer: 8, key: WLT, consumers: [12] }
+      - { topic: finance.wallet.MFSAccountRegistered.v1, producer: 8, key: WLT, consumers: [12] }
+      - { topic: finance.wallet.MFSAccountVerified.v1, producer: 8, key: WLT, consumers: [12] }
+      - { topic: finance.wallet.WalletCredited.v1, producer: 8, key: WLT, consumers: [11,12] }
+      - { topic: finance.wallet.WalletDebited.v1, producer: 8, key: WLT, consumers: [11,12] }
+      - { topic: finance.wallet.WalletFrozen.v1, producer: 8, key: WLT, consumers: [11,12] }
+      - { topic: finance.wallet.MFSWithdrawalInitiated.v1, producer: 8, key: TXN, consumers: [12] }
+      - { topic: finance.wallet.MFSWithdrawalConfirmed.v1, producer: 8, key: TXN, consumers: [11,12] }
+      - { topic: finance.wallet.MFSWithdrawalFailed.v1, producer: 8, key: TXN, consumers: [12] }
+      - { topic: finance.escrow.EscrowCreated.v1, producer: 8, key: ESC, consumers: [6,12] }
+      - { topic: finance.escrow.EscrowReleased.v1, producer: 8, key: ESC, consumers: [7,11,12] }
+      - { topic: finance.escrow.SettlementHoldReleased.v1, producer: 8, key: ESC, consumers: [11,12] }
+      - { topic: finance.escrow.EscrowReversed.v1, producer: 8, key: ESC, consumers: [6,11,12] }
+      # --- Logistics (#9) ---
+      - { topic: logistics.shipment.ShipmentCreated.v1, producer: 9, key: SHP, consumers: [6,12] }
+      - { topic: logistics.shipment.RiderAssigned.v1, producer: 9, key: SHP, consumers: [6,12] }
+      - { topic: logistics.shipment.PickupRecorded.v1, producer: 9, key: SHP, consumers: [12] }
+      - { topic: logistics.shipment.DeliveryRecorded.v1, producer: 9, key: SHP, consumers: [6,8,12] }
+      - { topic: logistics.shipment.ShipmentCancelled.v1, producer: 9, key: SHP, consumers: [6,8,12] }
+      - { topic: logistics.shipment.DeliveryFailed.v1, producer: 9, key: SHP, consumers: [6,12] }
+      # --- Fraud (#10) ---
+      - { topic: fraud.enforcement.FraudSignalRaised.v1, producer: 10, key: DID, consumers: [11,12] }
+      - { topic: fraud.enforcement.AccountHeld.v1, producer: 10, key: DID, consumers: [6,7,8,11] }
+      - { topic: fraud.enforcement.AccountHoldReleased.v1, producer: 10, key: DID, consumers: [6,7,8,11] }
+      # --- Government (#11) ---
+      - { topic: government.oversight.RecallDirectiveIssued.v1, producer: 11, key: recallId, consumers: [3] }
+      - { topic: government.oversight.TradeFreezeDirective.v1, producer: 11, key: directiveId, consumers: [7] }
+      - { topic: government.oversight.WalletFreezeDirective.v1, producer: 11, key: directiveId, consumers: [8] }
+      # --- Platform scheduler (#13) ---
+      - { topic: platform.scheduler.CoolingOffExpired.v1, producer: 13, key: ESC, consumers: [8] }
+      - { topic: platform.scheduler.EscrowExpired.v1, producer: 13, key: ESC, consumers: [8] }
+      - { topic: platform.scheduler.NILRollupRefresh.v1, producer: 13, key: GPID, consumers: [5] }
+
+  rabbitmq:
+    role: INTRA-CONTEXT only; NOT part of the Published Language (R6)
+    golden_rule: "No queue crosses a context boundary (R6)."
+    queues:
+      - { queue: identity.kyc-verification, context: 1, messages: [KYCSubmitted.v1], purpose: "Async KYC review — NOT Kafka", pii: true }
+      - { queue: identity.otp-dispatch, context: 1, messages: [OTP request], purpose: "OTP SMS dispatch", pii: true }
+      - { queue: catalog.image-processing, context: 2, messages: [image job], purpose: "Image resize/compress" }
+      - { queue: catalog.search-index, context: 2, messages: [index job], purpose: "OpenSearch index update" }
+      - { queue: b2c.order-confirmation, context: 6, messages: [confirmation job], purpose: "Order confirmation notification" }
+      - { queue: b2c.stock-reserve, context: 6, messages: [reserve job], purpose: "Async stock reservation" }
+      - { queue: logistics.rider-assignment, context: 9, messages: [assignment job], purpose: "Rider matching" }
+      - { queue: logistics.delivery-notification, context: 9, messages: [notification job], purpose: "Status notifications" }
+      - { queue: fraud.hold-approval-request, context: 10, messages: [hold request], purpose: "Four-eyes second-approver queue (R4)" }
+      - { queue: platform.notification-dispatch, context: 13, messages: [dispatch job], purpose: "Fan-out to SMS/email/push/USSD" }

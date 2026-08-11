@@ -1,0 +1,52 @@
+# Shared governance CI template (DOKANDAR Stage 0.1).
+# Consumed via `include:` by every repo. Validates baseline governance only — no business logic.
+# Green on GitLab shared runners. Trace: ADR-024, EF§17.2 (DoD = green pipeline), R6.
+stages: [governance]
+
+.governance_base:
+  image: alpine:3.20
+  tags: []
+  before_script:
+    - apk add --no-cache git >/dev/null 2>&1 || true
+
+governance:required-files:
+  extends: .governance_base
+  stage: governance
+  script:
+    - |
+      missing=0
+      for f in README.md CODEOWNERS .gitlab-ci.yml CHANGELOG.md VERSION CONTRIBUTING.md docs/architecture.md .editorconfig .gitignore; do
+        if [ ! -f "$f" ]; then echo "MISSING: $f"; missing=1; fi
+      done
+      [ "$missing" = "0" ] && echo "governance:required-files OK" || exit 1
+
+governance:conventional-commit:
+  extends: .governance_base
+  stage: governance
+  script:
+    - |
+      msg="$(git log -1 --pretty=%s)"
+      echo "HEAD subject: $msg"
+      echo "$msg" | grep -Eq '^(feat|fix|chore|docs|refactor|test|ci|perf|build|revert)(\([a-z0-9._-]+\))?!?: .+' \
+        && echo "governance:conventional-commit OK" \
+        || { echo "Commit subject is not Conventional Commits"; exit 1; }
+
+governance:traceability:
+  extends: .governance_base
+  stage: governance
+  script:
+    - |
+      grep -RqiE 'Trace:' README.md docs/architecture.md \
+        && echo "governance:traceability OK" \
+        || { echo "No Trace: anchor found (P1 traceability)"; exit 1; }
+
+governance:semver:
+  extends: .governance_base
+  stage: governance
+  script:
+    - |
+      v="$(tr -d ' \n\r\t' < VERSION)"
+      echo "VERSION=$v"
+      echo "$v" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$' \
+        && echo "governance:semver OK" \
+        || { echo "VERSION is not SemVer"; exit 1; }

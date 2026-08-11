@@ -1,0 +1,9 @@
+# .NET
+bin/
+obj/
+*.user
+TestResults/
+.vs/
+.idea/
+.vscode/
+.env

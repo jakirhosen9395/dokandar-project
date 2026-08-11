@@ -1,0 +1,43 @@
+# Access-Control / Permissions Registry. PRINCIPLES + role families are canonical (R1/R2/R4/R5/R7;
+# enum-registry). The concrete role x resource x action MATRIX is not in frozen canon verbatim ->
+# NEEDS-INFO (Phase 2 PDP policy). Machine-artifact (Header Profile, ADR-021). No rule invented.
+header:
+  id: permissions-registry
+  title: DOKANDAR Access-Control & Permissions
+  layer: L2
+  taxonomy: T7
+  doc_class: contracts
+  owner: identity-kyc (PDP) + security
+  classification: Internal
+  status: Draft
+  version: 1.0.0
+  trace: [R1, R2, R4, R5, R7, FR-IDN-005, ADR-018]
+  last_verified: { date: 2026-06-29, source_commit: PENDING }
+  source: BA (R1-R8, KYC tiers, fraud/oversight); enum-registry.md S-4; SA security/IAM
+
+model:
+  decision_point: "RBAC + ABAC evaluated by the Identity Policy Decision Point (PDP). The API gateway
+                   AUTHENTICATES (verifies OIDC/JWT + mTLS) but defers AUTHORIZATION to the PDP (R7)."
+
+# Binding access principles (each is a frozen design rule — enforced in code + CI fitness functions).
+principles:
+  - { id: R1-custody-sole-writer, rule: "Only custody-ledger-svc writes custody.*; all others are read-only consumers.", trace: R1 }
+  - { id: R2-finance-isolation,   rule: "Finance DB reachable only by Finance; DID->wallet resolution happens inside Finance.", trace: R2 }
+  - { id: R4-four-eyes,           rule: "Finance/Custody/Fraud/Government mutations require two DISTINCT human approvers (approver2 != approver1); only an enumerated narrow reversible-hold set is autonomous.", trace: R4 }
+  - { id: R5-government-readonly, rule: "Government has SELECT-only grants; intervenes on operational aggregates only via audited four-eyes directives.", trace: R5 }
+  - { id: read-only-contexts,     rule: "Provenance(#4), Inventory(#5 vs custody), Analytics(#12) are read-only projections; never write the source of truth.", trace: [R1, R6] }
+  - { id: pii-confinement,        rule: "PII lives only in Identity(#1); other contexts resolve via the Identity OHS; payloads carry IDs only (R6).", trace: [R6, R7] }
+
+# Role families — values transcribed VERBATIM from canon (enum-registry.md S-4); exhaustiveness per that doc.
+roles:
+  kyc_tiers:           { values: [V0, V1, V2, V3], source: FR-IDN-005 }
+  oversight_roles:     { values: [ANALYST, INVESTIGATOR, ENFORCEMENT_OFFICER, APPROVER, SUPER_ADMIN], source: "enum-registry S-4" }
+  enforcement_actions: { values: [WARN, RESTRICT_LISTING, SUSPEND, BLACKLIST, LICENSE_REVOKE], source: "enum-registry S-4" }
+
+# The concrete permission matrix (role x resource x action) and ABAC attributes are PDP policy,
+# not transcribed in frozen canon. Do NOT invent — enumerate in Phase 2.
+matrix: NEEDS-INFO
+
+needs_info:
+  - "Role x resource x action permission matrix + ABAC attribute set (PDP policy) — Phase 2."
+  - "The enumerated 'narrow autonomous reversible-hold set' for R4 — verbatim from BA (NEEDS-INFO)."

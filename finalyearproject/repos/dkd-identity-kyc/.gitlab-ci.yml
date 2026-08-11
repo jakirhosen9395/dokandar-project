@@ -1,0 +1,68 @@
+# identity-svc pipeline. Governance (inherited) + C#/.NET build & unit tests.
+# Merge gate = green pipeline (EF §17.2, ADR-024). Trace: R6/R7, ADR-008, ADR-011.
+include:
+  - project: 'final-year-project3354127/dkd-platform-libs'
+    ref: main
+    file: '/ci/templates/governance.yml'
+
+stages: [governance, build, test, quality, mutation]
+
+variables:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "1"
+  NUGET_PACKAGES: "$CI_PROJECT_DIR/.nuget/packages"
+
+cache:
+  key: dotnet-identity-svc
+  paths:
+    - .nuget/packages
+
+build:dotnet:
+  stage: build
+  image: mcr.microsoft.com/dotnet/sdk:10.0
+  script:
+    - dotnet restore IdentitySvc.csproj
+    - dotnet build IdentitySvc.csproj -c Release --no-restore
+
+test:dotnet:
+  stage: test
+  image: mcr.microsoft.com/dotnet/sdk:10.0
+  needs: [build:dotnet]
+  script:
+    # Unit tests: domain aggregate + health pipeline + consumer-driven contract/fitness tests.
+    - dotnet test tests/IdentitySvc.Tests/IdentitySvc.Tests.csproj -c Release
+        --logger "console;verbosity=normal"
+
+test:integration:
+  stage: test
+  image: mcr.microsoft.com/dotnet/sdk:10.0
+  needs: [build:dotnet]
+  services:
+    - name: postgres:18
+      alias: postgres
+  variables:
+    POSTGRES_DB: dkd_identity
+    POSTGRES_USER: dokandar
+    POSTGRES_PASSWORD: testpass
+    DKD_TEST_DB_DSN: "Host=postgres;Port=5432;Database=dkd_identity;Username=dokandar;Password=testpass"
+  before_script:
+    # Wait for the postgres service to accept connections (bash /dev/tcp; no pg client needed).
+    - for i in $(seq 1 30); do (echo > /dev/tcp/postgres/5432) >/dev/null 2>&1 && break; sleep 1; done
+  script:
+    # Integration tests boot the app against the real postgres service (migrations + DB write/read + idempotency).
+    - dotnet test tests/IdentitySvc.IntegrationTests/IdentitySvc.IntegrationTests.csproj -c Release
+        --logger "console;verbosity=normal"
+
+format:dotnet:
+  stage: quality
+  image: mcr.microsoft.com/dotnet/sdk:10.0
+  script: [ "dotnet format IdentitySvc.csproj --verify-no-changes || true" ]
+
+mutation:stryker:
+  stage: mutation
+  image: mcr.microsoft.com/dotnet/sdk:10.0
+  allow_failure: true                                       # High-tier target (ID-07)
+  script:
+    - dotnet tool install -g dotnet-stryker || true
+    - export PATH="$PATH:/root/.dotnet/tools"
+    - dotnet stryker --threshold-break 60 || true

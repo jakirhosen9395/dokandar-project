@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "identity-svc.fullname" . }}
+  labels: { app: identity-svc }
+spec:
+  selector: { app: identity-svc }
+  ports:
+    - { name: http, port: {{ .Values.service.port }}, targetPort: http }
+    - { name: metrics, port: {{ .Values.service.metricsPort }}, targetPort: metrics }

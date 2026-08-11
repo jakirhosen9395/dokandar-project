@@ -1,0 +1,6 @@
+# audit-log-svc (Context #13 Platform). The audit sink is append-only WORM; changes to the store,
+# migrations, and consumer are sensitive (they touch the durable audit of record).
+* @jakirhosen9395
+/migrations/ @jakirhosen9395
+/internal/store/ @jakirhosen9395
+/internal/consumer/ @jakirhosen9395

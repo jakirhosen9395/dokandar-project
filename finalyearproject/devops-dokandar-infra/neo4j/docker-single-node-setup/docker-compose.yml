@@ -1,0 +1,47 @@
+# Neo4j 5.26 Community — single node, Docker Compose. A graph database with a browser UI.
+#
+# HOW TO READ THIS FILE (Docker day 1):
+#   environment: NEO4J_AUTH = user/password (always "neo4j/<password>" for the admin user).
+#                The listen-address line lets it accept connections from other machines.
+#   ports:       7474 = the Neo4j Browser (a web UI you open in a browser)
+#                7687 = Bolt (the protocol drivers/cypher-shell use)
+#   healthcheck: the HTTP port answering means it is up.
+# Every ${...} value comes from the .env file next to this compose file.
+
+name: dki-neo4j
+
+services:
+  neo4j:
+    image: neo4j:${NEO4J_VERSION:-5.26.28-community}
+    container_name: dki_neo4j
+    restart: unless-stopped
+    # Give the process 30s to shut down CLEANLY on stop/restart (default 10s
+    # SIGKILLs databases mid-write and causes 'unclean shutdown' recovery).
+    stop_grace_period: 30s
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:?empty password - run setup_env.sh first}
+      NEO4J_server_default__listen__address: 0.0.0.0
+      # Explicit JVM heap + page cache (mandatory) — fits inside mem_limit below.
+      NEO4J_server_memory_heap_initial__size: ${NEO4J_HEAP:-512m}
+      NEO4J_server_memory_heap_max__size: ${NEO4J_HEAP:-512m}
+      NEO4J_server_memory_pagecache_size: ${NEO4J_PAGECACHE:-256m}
+    # Cap the container's RAM (heap + page cache + overhead stay inside it).
+    mem_limit: ${NEO4J_MEM_LIMIT:-1200m}
+    ports:
+      - "${NEO4J_HTTP_PORT:-7474}:7474"
+      - "${NEO4J_BOLT_PORT:-7687}:7687"
+    volumes:
+      - type: bind
+        source: ${DATA_ROOT:-/data/dki}/neo4j
+        target: /data
+        bind: { create_host_path: true }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:7474/ >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 25s
+
+networks:
+  default:
+    name: dki_neo4j_net

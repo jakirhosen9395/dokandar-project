@@ -1,0 +1,17 @@
+{
+  "name": "@dokandar/platform-sdk",
+  "version": "1.0.0",
+  "description": "DOKANDAR platform SDK (TypeScript) \u2014 generated from dkd-contracts-spine",
+  "type": "module",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.json && node --test dist/test/sdk.test.js"
+  },
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^24.0.0"
+  }
+}

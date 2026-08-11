@@ -1,0 +1,12 @@
+# XC-CI-2: standard .NET pipeline (build → test+coverage → format verify).
+stages: [build, test]
+build:
+  stage: build
+  image: mcr.microsoft.com/dotnet/sdk:10.0
+  script: [ "dotnet build -c Release" ]
+test:
+  stage: test
+  image: mcr.microsoft.com/dotnet/sdk:10.0
+  script:
+    - dotnet test --collect:"XPlat Code Coverage" || dotnet test
+    - dotnet format --verify-no-changes || true

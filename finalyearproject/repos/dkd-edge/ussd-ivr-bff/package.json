@@ -1,0 +1,14 @@
+{
+  "name": "ussd-ivr-bff",
+  "version": "0.1.0",
+  "description": "DOKANDAR edge #35 — USSD/IVR BFF: stateful Bangla menu (<=160 char) that reaches the SAME write APIs as the app path (R8 channel parity)",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test \"dist/test/**/*.test.js\""
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -1,0 +1,84 @@
+# dkd-platform-libs CI — Phase 2. Generates every SDK from the frozen contracts and proves:
+#  governance · generator tests · contract-compatibility (freeze) · generator-drift (committed==regenerated)
+#  · per-language build+test (Java/Go/TS/Python) · version validation.
+# Trace: ADR-016/021, R6, R7.
+include:
+  - local: '/ci/templates/governance.yml'
+
+stages: [governance, generate, build]
+
+variables:
+  DKDGEN_BUILD_TIME: "2026-06-29T00:00:00Z"
+  DKDGEN_BUILD_COMMIT: "source"
+
+# ---------- generator: unit tests, contract compatibility, generation drift ----------
+generator:tests:
+  stage: generate
+  image: python:3.13-slim
+  before_script:
+    - pip install --quiet --disable-pip-version-check pyyaml pytest
+  script:
+    - cd generators && python -m pytest tests/ -q
+
+contracts:compat:
+  stage: generate
+  image: python:3.13-slim
+  before_script:
+    - pip install --quiet --disable-pip-version-check pyyaml
+  script:
+    - PYTHONPATH=generators python -m dkdgen verify --contracts contracts
+    - 'lockv=$(grep "^version:" contracts/spine.lock.yaml | awk "{print \$2}" | tr -d "\r")'
+    - 'test "$lockv" = "1.0.0" || { echo "consumed contracts must be frozen v1.0.0 but got $lockv"; exit 1; }'
+    - 'echo "contract-compat OK - frozen contracts v$lockv consumed by platform-libs"'
+
+generate:drift:
+  stage: generate
+  image: python:3.13-slim
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq git >/dev/null
+    - pip install --quiet --disable-pip-version-check pyyaml
+  script:
+    - bash scripts/generate.sh all
+    - 'test -z "$(git status --porcelain sdk/)" || { echo "GENERATOR DRIFT - committed SDKs differ from a fresh generation"; git --no-pager diff --stat sdk/; exit 1; }'
+    - 'echo "generator-drift OK - committed SDKs == regenerated from contracts"'
+
+# ---------- per-language SDK build + test ----------
+sdk:python:
+  stage: build
+  image: python:3.13-slim
+  before_script:
+    - pip install --quiet --disable-pip-version-check pytest
+  script:
+    - cd sdk/python && python -m pytest tests/ -q
+
+sdk:go:
+  stage: build
+  image: golang:1.25
+  script:
+    - cd sdk/go && go vet ./... && go build ./... && go test ./...
+
+sdk:java:
+  stage: build
+  image: maven:3.9-eclipse-temurin-21
+  script:
+    - cd sdk/java && mvn -q -B test
+
+sdk:typescript:
+  stage: build
+  image: node:24
+  script:
+    - cd sdk/typescript && npm install --no-audit --no-fund --silent && npm run build && npm test
+
+sdk:csharp:
+  stage: build
+  image: mcr.microsoft.com/dotnet/sdk:10.0
+  script:
+    - cd sdk/csharp && dotnet test Dkd.Platform.Tests/Dkd.Platform.Tests.csproj
+
+openapi:validate:
+  stage: generate
+  image: python:3.13-slim
+  before_script:
+    - pip install --quiet --disable-pip-version-check openapi-spec-validator
+  script:
+    - python -c "import json; from openapi_spec_validator import validate; validate(json.load(open('sdk/openapi/dkd-platform.openapi.json'))); print('OpenAPI 3.1 document is valid')"

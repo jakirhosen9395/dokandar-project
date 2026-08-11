@@ -1,0 +1,17 @@
+// custody-passport-ohs (B2B-F2 / R6 internal plane). Read-only gRPC OHS for a passport head —
+// the gRPC surface other contexts (e.g. B2B) use instead of the REST GET, per EF-API-1.
+syntax = "proto3";
+package dokandar.custody.ohs.v1;
+option go_package = "gitlab.com/final-year-project3354127/custody-ledger-svc/internal/passportohs/pb";
+
+service CustodyPassportOhs {
+  rpc GetPassport (GetPassportRequest) returns (PassportReply);
+}
+message GetPassportRequest { string ppid = 1; }
+message PassportReply {
+  bool   found          = 1;
+  string ppid           = 2;
+  string gpid           = 3;
+  string current_holder = 4;
+  string status         = 5;
+}

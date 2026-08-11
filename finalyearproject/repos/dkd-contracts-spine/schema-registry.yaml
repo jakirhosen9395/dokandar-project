@@ -1,0 +1,90 @@
+# Schema-Registry Contract — one registered subject per Kafka topic (EF §8.4). The POLICY is
+# canonical; per-event JSON-Schema/AsyncAPI payloads are Phase-2 (DM is the codegen source)
+# -> schema: NEEDS-INFO. Subjects are GENERATED from messaging.yaml (no hand transcription).
+# Machine-artifact (Header Profile, ADR-021).
+header:
+  id: schema-registry
+  title: DOKANDAR Event Schema Registry
+  layer: L2
+  taxonomy: T7
+  doc_class: contracts
+  owner: event-spine-published-language-board
+  classification: Internal
+  status: Draft
+  version: 1.0.0
+  trace: [EF§8.4, R6, ADR-010, ADR-016]
+  last_verified: { date: 2026-06-29, source_commit: PENDING }
+  source: generated from dkd-contracts-spine/messaging.yaml (Kafka catalog)
+
+policy:
+  subject_naming: "one registered schema subject per Kafka topic; subject == topic name (EF §8.4)"
+  compatibility: "backward-compatible within a major version; additive-only changes (EF §8.4)"
+  breaking_change: "a breaking change is a NEW .v(N+1) topic + dual-publish >=2 release cycles; never an in-place edit (R6; S-TOPIC)"
+  payload_rule: "payloads carry canonical IDs only, never PII (R6); validated at the edge before entering the domain (EF C7)"
+  format: "AsyncAPI 3 + JSON-Schema per event (DM aggregates are the source of truth)"
+  rabbitmq: "RabbitMQ intra-context messages are NOT in this registry / Published Language (R6)"
+
+# 59 subjects (== 59 Kafka topics in messaging.yaml). schema body = NEEDS-INFO (Phase 2).
+subjects:
+  - { subject: identity.party.PartyRegistered.v1, topic: identity.party.PartyRegistered.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: identity.party.KYCApproved.v1, topic: identity.party.KYCApproved.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: identity.party.KYCTierChanged.v1, topic: identity.party.KYCTierChanged.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: identity.party.KYCRejected.v1, topic: identity.party.KYCRejected.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: identity.party.PartySuspended.v1, topic: identity.party.PartySuspended.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: identity.party.PartyReactivated.v1, topic: identity.party.PartyReactivated.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: catalog.product.ProductCreated.v1, topic: catalog.product.ProductCreated.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: catalog.product.ProductPublished.v1, topic: catalog.product.ProductPublished.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: catalog.product.ProductDeprecated.v1, topic: catalog.product.ProductDeprecated.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: catalog.product.ProductPriceRuleAdded.v1, topic: catalog.product.ProductPriceRuleAdded.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: catalog.product.ProductMasterDataUpdated.v1, topic: catalog.product.ProductMasterDataUpdated.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: custody.passport.CustodyInitialized.v1, topic: custody.passport.CustodyInitialized.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: custody.passport.CustodyTransferred.v1, topic: custody.passport.CustodyTransferred.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: custody.passport.CustodySplit.v1, topic: custody.passport.CustodySplit.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: custody.passport.CustodyMerged.v1, topic: custody.passport.CustodyMerged.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: custody.passport.ProductRecalled.v1, topic: custody.passport.ProductRecalled.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: custody.passport.CustodialSigned.v1, topic: custody.passport.CustodialSigned.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: b2c.order.OrderPlaced.v1, topic: b2c.order.OrderPlaced.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: b2c.order.PaymentConfirmed.v1, topic: b2c.order.PaymentConfirmed.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: b2c.order.OrderProcessingStarted.v1, topic: b2c.order.OrderProcessingStarted.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: b2c.order.OrderShipped.v1, topic: b2c.order.OrderShipped.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: b2c.order.OrderDelivered.v1, topic: b2c.order.OrderDelivered.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: b2c.order.OrderCancelled.v1, topic: b2c.order.OrderCancelled.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: b2c.order.OrderRefunded.v1, topic: b2c.order.OrderRefunded.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: b2b.tradeorder.TradeOrderCreated.v1, topic: b2b.tradeorder.TradeOrderCreated.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: b2b.tradeorder.MarginPosted.v1, topic: b2b.tradeorder.MarginPosted.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: b2b.tradeorder.TradeActivated.v1, topic: b2b.tradeorder.TradeActivated.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: b2b.tradeorder.SettlementInitiated.v1, topic: b2b.tradeorder.SettlementInitiated.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: b2b.tradeorder.TradeSettled.v1, topic: b2b.tradeorder.TradeSettled.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: b2b.tradeorder.TradeDisputed.v1, topic: b2b.tradeorder.TradeDisputed.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: b2b.tradeorder.TradeCancelled.v1, topic: b2b.tradeorder.TradeCancelled.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: finance.wallet.WalletCreated.v1, topic: finance.wallet.WalletCreated.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: finance.wallet.MFSAccountRegistered.v1, topic: finance.wallet.MFSAccountRegistered.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: finance.wallet.MFSAccountVerified.v1, topic: finance.wallet.MFSAccountVerified.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: finance.wallet.WalletCredited.v1, topic: finance.wallet.WalletCredited.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: finance.wallet.WalletDebited.v1, topic: finance.wallet.WalletDebited.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: finance.wallet.WalletFrozen.v1, topic: finance.wallet.WalletFrozen.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: finance.wallet.MFSWithdrawalInitiated.v1, topic: finance.wallet.MFSWithdrawalInitiated.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: finance.wallet.MFSWithdrawalConfirmed.v1, topic: finance.wallet.MFSWithdrawalConfirmed.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: finance.wallet.MFSWithdrawalFailed.v1, topic: finance.wallet.MFSWithdrawalFailed.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: finance.escrow.EscrowCreated.v1, topic: finance.escrow.EscrowCreated.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: finance.escrow.EscrowReleased.v1, topic: finance.escrow.EscrowReleased.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: finance.escrow.SettlementHoldReleased.v1, topic: finance.escrow.SettlementHoldReleased.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: finance.escrow.EscrowReversed.v1, topic: finance.escrow.EscrowReversed.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: logistics.shipment.ShipmentCreated.v1, topic: logistics.shipment.ShipmentCreated.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: logistics.shipment.RiderAssigned.v1, topic: logistics.shipment.RiderAssigned.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: logistics.shipment.PickupRecorded.v1, topic: logistics.shipment.PickupRecorded.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: logistics.shipment.DeliveryRecorded.v1, topic: logistics.shipment.DeliveryRecorded.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: logistics.shipment.ShipmentCancelled.v1, topic: logistics.shipment.ShipmentCancelled.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: logistics.shipment.DeliveryFailed.v1, topic: logistics.shipment.DeliveryFailed.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: fraud.enforcement.FraudSignalRaised.v1, topic: fraud.enforcement.FraudSignalRaised.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: fraud.enforcement.AccountHeld.v1, topic: fraud.enforcement.AccountHeld.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: fraud.enforcement.AccountHoldReleased.v1, topic: fraud.enforcement.AccountHoldReleased.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: government.oversight.RecallDirectiveIssued.v1, topic: government.oversight.RecallDirectiveIssued.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: government.oversight.TradeFreezeDirective.v1, topic: government.oversight.TradeFreezeDirective.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: government.oversight.WalletFreezeDirective.v1, topic: government.oversight.WalletFreezeDirective.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: platform.scheduler.CoolingOffExpired.v1, topic: platform.scheduler.CoolingOffExpired.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: platform.scheduler.EscrowExpired.v1, topic: platform.scheduler.EscrowExpired.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+  - { subject: platform.scheduler.NILRollupRefresh.v1, topic: platform.scheduler.NILRollupRefresh.v1, compatibility: BACKWARD, schema: NEEDS-INFO }
+
+needs_info:
+  - "Per-subject JSON-Schema / AsyncAPI payload definitions — Phase 2 (verbatim from DM aggregates)."

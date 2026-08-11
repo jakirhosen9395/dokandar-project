@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>IdentitySvc</RootNamespace>
+    <AssemblyName>IdentitySvc</AssemblyName>
+    <Optimize>true</Optimize>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- dkd-platform-libs C# SDK (Dkd.Platform), vendored pinned copy of v1.3.0.
+         Local-link workaround until the SDK is published to a NuGet feed (see sdk/README.md). -->
+    <ProjectReference Include="sdk/Dkd.Platform/Dkd.Platform.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql" Version="9.0.3" />
+    <PackageReference Include="Confluent.Kafka" Version="2.6.1" />
+    <PackageReference Include="RabbitMQ.Client" Version="6.8.1" />
+    <PackageReference Include="Grpc.AspNetCore" Version="2.67.0" />
+    <!-- Single OpenAPI generator: Swashbuckle (Swagger). Serves JSON at /swagger/v1/swagger.json
+         and the interactive UI at /docs. -->
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.10.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.10.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.10.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Protobuf Include="proto/identity_party_ohs.proto" GrpcServices="Server" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Ship SQL migrations next to the assembly so the migrator finds them at runtime. -->
+    <Content Include="migrations/**/*.sql" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Exclude test source trees from the main project compilation. -->
+    <Compile Remove="tests/**" />
+    <!-- The vendored SDK is compiled via its own ProjectReference; do not double-compile its sources. -->
+    <Compile Remove="sdk/**" />
+    <Content Remove="sdk/**" />
+    <None Remove="sdk/**" />
+  </ItemGroup>
+
+</Project>

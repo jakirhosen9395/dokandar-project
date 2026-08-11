@@ -1,0 +1,54 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: finance-ledger-svc
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/dkd_finance}
+    username: ${SPRING_DATASOURCE_USERNAME:dokandar}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    hikari:
+      maximum-pool-size: 10
+  jackson:
+    deserialization:
+      # integer poisha only — a float where a long is expected must be rejected, never truncated
+      accept-float-as-int: false
+  kafka:
+    bootstrap-servers: ${DKD_KAFKA_BROKERS:localhost:9092}
+    consumer:
+      group-id: finance-ledger-svc
+      enable-auto-commit: false
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        enable.idempotence: true
+    listener:
+      ack-mode: record
+
+management:
+  server:
+    port: 9090
+  endpoints:
+    web:
+      base-path: /
+      exposure:
+        include: prometheus,health
+      path-mapping:
+        prometheus: metrics
+
+springdoc:
+  swagger-ui:
+    path: /docs
+  api-docs:
+    path: /swagger/v1/swagger.json
+
+dkd:
+  cooling-off-ms: ${DKD_COOLING_OFF_MS:259200000}
+  sys-cash-account: ${DKD_SYS_CASH_ACCOUNT:SYS-CASH}
+  build-info-path: ${DKD_BUILD_INFO_PATH:/app/build-info.properties}

@@ -1,0 +1,39 @@
+# Machine glossary — the companion to enum-registry.md (FR-IDN-310 doc-of-record). Generated UNDER
+# that doc (ADR-021). Term-family NAMES + values are transcribed VERBATIM from canon (enum-registry
+# S-4); per canon the value lists are ILLUSTRATIVE-not-exhaustive -> exhaustiveness = NEEDS-INFO.
+# No value fabricated.
+header:
+  id: glossary-registry
+  title: DOKANDAR Machine Glossary (FR-IDN-310 companion)
+  layer: L2
+  taxonomy: T7
+  doc_class: contracts
+  owner: identity-kyc
+  classification: Internal
+  status: In-Review
+  version: 1.0.0
+  trace: [FR-IDN-310, NFR-MNT-040, R7, R6, ADR-018, ADR-021]
+  last_verified: { date: 2026-06-29, source_commit: PENDING }
+  source: dkd-contracts-spine/enum-registry.md (doc-of-record); BA/DM
+
+doc_of_record: "enum-registry.md — this machine artifact is governed by it (ADR-021). Values transcribed VERBATIM only."
+
+# Enum/term families evidenced in canon (enum-registry.md S-4). `exhaustive: true` only where canon
+# states the full set (KYC tiers); otherwise the list is the canon-named illustrative set.
+term_families:
+  - { family: kyc_tiers,           values: [V0, V1, V2, V3], source: FR-IDN-005, exhaustive: true }
+  - { family: fraud_detectors,     values: [HOARDING, PASSPORT_FORGERY, GHOST_SPLIT, MFS_STRUCTURING, SUBSIDY_DUP, CIRCULAR_TRADE, VELOCITY_ANOMALY, GEO_IMPOSSIBLE, COLLUSION_RING], source: "BA fraud dashboard", exhaustive: NEEDS-INFO }
+  - { family: fraud_case_states,   values: [OPEN, INVESTIGATING, SUBSTANTIATED, ENFORCED, DISMISSED], source: "enum-registry S-4", exhaustive: NEEDS-INFO }
+  - { family: enforcement_actions, values: [WARN, RESTRICT_LISTING, SUSPEND, BLACKLIST, LICENSE_REVOKE], source: "enum-registry S-4", exhaustive: NEEDS-INFO }
+  - { family: oversight_roles,     values: [ANALYST, INVESTIGATOR, ENFORCEMENT_OFFICER, APPROVER, SUPER_ADMIN], source: "enum-registry S-4", exhaustive: NEEDS-INFO }
+  - { family: party_actor_codes,   values: [FARIA, WHOLESALER, RETAIL, GOV, PERSON, ORG], source: "BA actor table", exhaustive: NEEDS-INFO }
+  - { family: commodity_units,     values: [seer, maund, bosta], note: "+ SI base units; conversion factors NEEDS-INFO (OQ-enum-2)", source: "BA/DM", exhaustive: NEEDS-INFO }
+
+bangla_bridge: NEEDS-INFO   # Bangla<->English canonical-key display mapping (enum-registry S-2) — Phase 2
+
+versioning: "semver; any enum/actor-code change is BREAKING -> registry version bump + migration note (NFR-MNT-040)"
+
+needs_info:
+  - "Exhaustive value lists + codes per family (enum-registry OQ-enum-1) — Phase 2 verbatim transcription."
+  - "Bangla<->English domain bridge entries (enum-registry S-2) — Phase 2."
+  - "Commodity-unit conversion factors (enum-registry OQ-enum-2) — Phase 2."

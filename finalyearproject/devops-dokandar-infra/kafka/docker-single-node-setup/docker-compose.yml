@@ -1,0 +1,92 @@
+# Apache Kafka 4.3 — single node (KRaft mode, NO ZooKeeper) + the Provectus kafka-ui.
+#
+# HOW TO READ THIS FILE (Docker day 1):
+#   Two services: `kafka` (the broker) and `kafka-ui` (a web dashboard for it).
+#   Kafka has THREE "listeners" (doors it accepts connections on):
+#     • PLAINTEXT (:29092) — for containers on THIS docker network (the UI uses it)
+#     • PLAINTEXT_HOST (:9092) — for clients OUTSIDE docker (your laptop, other hosts)
+#     • CONTROLLER (:9093) — Kafka talking to itself to elect a leader (KRaft)
+#   ADVERTISED_LISTENERS tells clients which address to reconnect on — the HOST one
+#     MUST be this machine's public IP so an external client can find the broker.
+#   CLUSTER_ID is generated once by setup.sh (KRaft binds the log dir to it).
+# Every ${...} value comes from the .env file next to this compose file.
+
+name: dki-kafka
+
+services:
+  kafka:
+    image: apache/kafka:${KAFKA_VERSION:-4.3.0}
+    container_name: dki_kafka
+    hostname: kafka
+    restart: unless-stopped
+    # Give the process 30s to shut down CLEANLY on stop/restart (default 10s
+    # SIGKILLs databases mid-write and causes 'unclean shutdown' recovery).
+    stop_grace_period: 30s
+    environment:
+      # --- KRaft: this node is BOTH a broker and the controller (single-node) ---
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      CLUSTER_ID: ${KAFKA_CLUSTER_ID:?run setup.sh up - it generates the cluster id}
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # --- the three listeners described in the header ---
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://${KAFKA_EXTERNAL_HOST:-localhost}:${KAFKA_EXTERNAL_PORT:-9092}
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # --- single-node replication settings (must be 1 with one broker) ---
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      # Explicit JVM heap (mandatory) — the mem_limit below must exceed heap + overhead.
+      KAFKA_HEAP_OPTS: ${KAFKA_HEAP_OPTS:--Xms256m -Xmx512m}
+    # Cap the container's RAM (mandatory — keeps the 8GB host stable).
+    mem_limit: ${KAFKA_MEM_LIMIT:-1g}
+    ports:
+      # Publish ONLY the external listener; :29092 stays inside the docker network.
+      - "${KAFKA_EXTERNAL_PORT:-9092}:9092"
+    volumes:
+      - type: bind
+        source: ${DATA_ROOT:-/data/dki}/kafka
+        target: /var/lib/kafka/data
+        bind: { create_host_path: true }
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 20s
+
+  kafka-ui:
+    # A friendly web dashboard: browse topics, messages, consumer groups.
+    image: ${KAFKA_UI_IMAGE:-provectuslabs/kafka-ui:v0.7.2}
+    container_name: dki_kafka_ui
+    restart: unless-stopped
+    # Give the process 30s to shut down CLEANLY on stop/restart (default 10s
+    # SIGKILLs databases mid-write and causes 'unclean shutdown' recovery).
+    stop_grace_period: 30s
+    depends_on:
+      kafka: { condition: service_healthy }
+    environment:
+      KAFKA_CLUSTERS_0_NAME: dki
+      # The UI talks to the broker over the INTERNAL docker listener.
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      DYNAMIC_CONFIG_ENABLED: "true"
+    # Cap the UI's RAM too — it is a JVM app.
+    mem_limit: ${KAFKA_UI_MEM_LIMIT:-512m}
+    ports:
+      - "${KAFKA_UI_PORT:-8080}:8080"
+    # Ready = the UI's Spring actuator answers (wget ships in the image's busybox).
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+networks:
+  default:
+    name: dki_kafka_net

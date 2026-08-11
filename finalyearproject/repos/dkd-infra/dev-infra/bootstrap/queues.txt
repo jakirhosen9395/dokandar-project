@@ -1,0 +1,10 @@
+b2c.order-confirmation
+b2c.stock-reserve
+catalog.image-processing
+catalog.search-index
+fraud.hold-approval-request
+identity.kyc-verification
+identity.otp-dispatch
+logistics.delivery-notification
+logistics.rider-assignment
+platform.notification-dispatch

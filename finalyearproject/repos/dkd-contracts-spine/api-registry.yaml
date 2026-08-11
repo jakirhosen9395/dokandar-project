@@ -1,0 +1,51 @@
+# API Registry — the platform's API planes + published Open-Host Services. Surfaces NAMED in canon
+# are registered; concrete OpenAPI/proto signatures are Phase-2 (OHS guides say "RPC signatures TBD")
+# -> NEEDS-INFO. Machine-artifact (Header Profile, ADR-021). No endpoint invented.
+header:
+  id: api-registry
+  title: DOKANDAR API & OHS Registry
+  layer: L2
+  taxonomy: T7
+  doc_class: contracts
+  owner: api-governance-board + event-spine-board
+  classification: Internal
+  status: Draft
+  version: 1.0.0
+  trace: [EF§7, R6, R7, ADR-008]
+  last_verified: { date: 2026-06-29, source_commit: PENDING }
+  source: EF §7 (REST/gRPC); spine/ohs/*; DM/SA OHS surfaces
+
+planes:
+  external:
+    protocol: REST
+    version: v1
+    entry: "API Gateway + BFFs (app, ussd-ivr, partner)"
+    envelope: "{success, data, error, meta}"
+    pagination: "cursor-only (no offset)"
+    errors: "RFC-7807 problem+json (see error-codes.yaml)"
+    idempotency: "Idempotency-Key header mandatory on unsafe/money/custody writes"
+    trace: [EF§7, R8]
+  internal:
+    protocol: gRPC
+    kind: "Open-Host Service (OHS) ONLY"
+    rule: "no context calls another context's REST or DB; gRPC OHS is the only synchronous cross-context surface (R6/R7)"
+    trace: [R6, R7]
+
+# Published Open-Host Services. operations[] are the method names NAMED in canon; .proto = Phase 2.
+ohs_services:
+  - { id: identity-party-ohs, owner_ctx: 1, root_id: DID, provides: "Party read model; the ONLY PII resolver",
+      consumers: all, proto: NEEDS-INFO, guide: "dkd-platform-docs/spine/ohs/identity-party-ohs-consumer-guide.md", trace: [R7, ADR-008] }
+  - { id: catalog-product-ohs, owner_ctx: 2, root_id: GPID, provides: "Product master-data read model; sole GPID issuer",
+      consumers: all, proto: NEEDS-INFO, guide: "dkd-platform-docs/spine/ohs/catalog-product-ohs-consumer-guide.md", trace: [R7, ADR-008] }
+  - { id: inventory-ohs, owner_ctx: 5, operations: [Reserve, Release, Confirm, GetLocalStock],
+      note: "synchronous strong-LOCAL stock; the saga's one synchronous island", proto: NEEDS-INFO, trace: [R1] }
+  - { id: finance-ohs, owner_ctx: 8, operations: [HoldEscrow, ApplyFraudHold, PostSubsidy, QuoteSettlement],
+      note: "ApplyFraudHold from #10 (four-eyes); PostSubsidy from #11 (four-eyes)", proto: NEEDS-INFO, trace: [R2, R4] }
+  - { id: platform-ohs, owner_ctx: 13, provides: "notification / search / document / audit-sink / scheduler OHS",
+      proto: NEEDS-INFO, trace: [R6] }
+
+rest_apis: NEEDS-INFO   # per-context external /v1 OpenAPI surfaces (gateway/BFF routes) — Phase 2
+
+needs_info:
+  - "All gRPC .proto service/method/message signatures (OHS guides: 'RPC signatures TBD, Phase 2')."
+  - "Per-context external REST /v1 OpenAPI specifications — Phase 2."

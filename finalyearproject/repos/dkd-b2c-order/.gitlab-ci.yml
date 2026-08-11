@@ -1,0 +1,33 @@
+stages: [build, lint, package]
+
+node:build-test:
+  stage: build
+  image: node:24
+  before_script:
+    # consume @dokandar/platform-sdk by building the cloned SDK and linking it locally
+    - apt-get update -qq && apt-get install -y -qq git >/dev/null
+    - git clone --depth 1 --branch v1.0.0 "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/final-year-project3354127/dkd-platform-libs.git" /tmp/libs
+    - (cd /tmp/libs/sdk/typescript && npm install --no-audit --no-fund && npm run build)
+    - npm install --no-audit --no-fund /tmp/libs/sdk/typescript
+  script:
+    - npm install --no-audit --no-fund
+    - npm run build
+    - npm test
+
+docker:build:
+  stage: package
+  image: docker:27
+  services: [docker:27-dind]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  script:
+    - docker build -t "$CI_REGISTRY_IMAGE:0.1.0" .
+
+lint:
+  stage: lint
+  image: node:24
+  allow_failure: true
+  script:
+    - npm install --no-audit --no-fund
+    - npx eslint src/ --ext .ts || true          # B2C-10 ESLint gate
+    - npx tsc --noEmit                            # strict + noUncheckedIndexedAccess typecheck

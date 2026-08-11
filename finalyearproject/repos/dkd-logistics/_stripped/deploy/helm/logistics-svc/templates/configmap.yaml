@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "logistics-svc.fullname" . }}-config
+data:
+  {{- range $k, $v := .Values.env }}
+  {{ $k }}: {{ $v | quote }}
+  {{- end }}
+  DKD_SERVICE_NAME: logistics-svc
+  DKD_CONTEXT: logistics
+  DKD_HTTP_PORT: "8080"

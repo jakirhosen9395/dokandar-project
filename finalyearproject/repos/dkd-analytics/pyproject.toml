@@ -1,0 +1,44 @@
+[project]
+name = "analytics-svc"
+version = "0.1.0"
+description = "DOKANDAR Context #12 Analytics & Forecasting — read-only OLAP consumer (advisory only)"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.32",
+    "clickhouse-connect>=0.8",
+    "confluent-kafka>=2.6",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-cov>=6", "ruff>=0.8", "mypy>=1.13", "httpx>=0.28"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "C4", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = "src"
+
+[[tool.mypy.overrides]]
+module = ["confluent_kafka.*", "clickhouse_connect.*"]
+ignore_missing_imports = true
+
+[tool.coverage.run]
+omit = ["src/analytics/main.py", "src/analytics/consumer.py", "src/analytics/ch.py"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+addopts = "--cov=analytics --cov-report=term --cov-fail-under=80"

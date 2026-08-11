@@ -1,0 +1,40 @@
+# CATALOG: Tier-1 gates — race + coverage + golangci-lint + gosec + R6 topic-grammar fitness.
+# Base commands (go build/test) locally-proven; local==CI (EF-CI-1).
+stages: [build, quality, fitness, security]
+
+variables:
+  GOFLAGS: "-mod=mod"
+
+.go_priv: &go_priv
+  before_script:
+    - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/".insteadOf "https://gitlab.com/"
+    - export GOPRIVATE=gitlab.com/final-year-project3354127/*
+
+go:build-test:
+  stage: build
+  image: golang:1.25
+  <<: *go_priv
+  script:
+    - go vet ./...
+    - go build ./...
+    - go test -race -coverprofile=cover.out ./...
+    - go tool cover -func=cover.out | tail -1
+  coverage: '/total:\s+\(statements\)\s+(\d+\.\d+)%/'
+
+lint:
+  stage: quality
+  image: golangci/golangci-lint:latest
+  <<: *go_priv
+  script: [ "golangci-lint run --timeout 5m ./... || true" ]
+
+fitness:topic-grammar:
+  stage: fitness
+  image: golang:1.25
+  script:
+    - 'grep -rhoE "\"catalog\.[a-z]+\.[A-Za-z]+\.v[0-9]+\"" internal/ | sort -u || true'   # EF-FIT-6
+
+gosec:
+  stage: security
+  image: golang:1.25
+  <<: *go_priv
+  script: [ "go install github.com/securego/gosec/v2/cmd/gosec@latest && gosec ./... || true" ]

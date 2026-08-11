@@ -1,0 +1,45 @@
+# Canonical persistence registry. Engine-of-record = System-Architecture §8.1 Database
+# Placement table (the most specific per-service statement). Machine-artifact (Header Profile,
+# ADR-021); governed by dkd-contracts-spine/README.md. Per ADR-017, engines named in other L0
+# docs but ABSENT from §8.1 are recorded as `unreconciled_variants` (NOT silently adopted) and
+# must be confirmed by the owning team via an additive ADR at build time.
+header:
+  id: data-stores-registry
+  title: DOKANDAR Persistence Registry
+  layer: L2
+  taxonomy: T7
+  doc_class: contracts
+  owner: platform + event-spine-board
+  classification: Internal
+  status: Draft
+  version: 0.1.0
+  trace: [SYS§8.1, R1, R2, R6, ADR-001, ADR-002, ADR-003, ADR-004, ADR-017]
+  last_verified: { date: 2026-06-28, source_commit: PENDING }
+  source: DOKANDAR-System-Architecture.md lines 973-989
+
+rules:
+  - "Database-per-service; no two services share a schema or connection (R6)."
+  - "Finance (#8) and Custody (#3) get dedicated isolated instances + NetworkPolicy (R1/R2)."
+  - "Cross-context data flows ONLY via the event spine (R6); never a cross-store read."
+
+services:
+  - { ctx: 1, service: identity-svc / kyc-adapter-svc, engine: [Postgres], class: relational, note: "Master-data OHS (R7); ADR-008" }
+  - { ctx: 2, service: catalog-svc, engine: [Postgres, OpenSearch], class: relational+search, note: "Master data (R7); search read model" }
+  - { ctx: 3, service: custody-ledger-svc, engine: [Postgres], class: event-store-append-only, isolation: dedicated, note: "Sole writer, event-sourced (R1, ADR-002)" }
+  - { ctx: 4, service: provenance-projection-workers / recall-svc, engine: [Neo4j-class], class: graph, note: "CQRS read model of custody; recall traversal" }
+  - { ctx: 5, service: inventory-svc / stock-projection-workers / nil-rollup-svc, engine: [Postgres], class: relational-projection, note: "Projected from custody (R1)" }
+  - { ctx: 6, service: b2c-order-svc / b2c-catalog-read-svc, engine: [Postgres, OpenSearch], class: relational+search, note: "Order write store + denormalized catalog read" }
+  - { ctx: 7, service: b2b-trade-svc / margining-svc, engine: [Postgres], class: relational, note: "Trade + margin state" }
+  - { ctx: 8, service: finance-ledger-svc / escrow-svc / payout-svc, engine: [Postgres], class: isolated-relational-double-entry, isolation: dedicated, note: "No shared DB + exactly-once (R2, ADR-004)" }
+  - { ctx: 9, service: logistics-svc / telemetry-ingest-workers, engine: [Postgres, Timescale], class: relational+timeseries, note: "Shipment state + telemetry" }
+  - { ctx: 10, service: fraud-scoring-svc / enforcement-svc, engine: [Postgres, Redis], class: relational+feature-cache, note: "Scores, cases, four-eyes state (R4)" }
+  - { ctx: 11, service: oversight-read-svc / intervention-svc, engine: [Postgres-read-replicas], class: relational-read-mostly, note: "Read-mostly oversight (R5)" }
+  - { ctx: 12, service: analytics-pipeline / forecasting-svc, engine: [ClickHouse-class], class: olap, note: "Columnar analytics OHS sink" }
+  - { ctx: 13, service: notification-svc / search-svc / document-svc / audit-log-svc, engine: [Redis, OpenSearch, MinIO, Postgres-append-only], class: mixed, note: "Platform utilities; audit = OHS sink (R6)" }
+
+# ADR-017 — cross-document variants present in L0 but ABSENT from SYS §8.1 (NOT adopted here;
+# flagged for owning-team confirmation via additive ADR). CLAUDE.md carries the same caveat.
+unreconciled_variants:
+  - { engine: MongoDB, named_in: DOKANDAR-Domain-Model.md, absent_from: "SYS §8.1", candidate_contexts: [2,6,10], status: unreconciled, action: "owning team confirms or drops via ADR (W2/W3)" }
+  - { engine: RustFS, named_in: DOKANDAR-Domain-Model.md, vs: "MinIO (SYS §8.1 object store)", status: unreconciled, action: "ARB picks one canonical object store" }
+  - { engine: DuckDB, named_in: "SYS §8.1 (alongside ClickHouse)", status: unreconciled, action: "confirm OLAP engine; DuckDB likely embedded/local-only" }

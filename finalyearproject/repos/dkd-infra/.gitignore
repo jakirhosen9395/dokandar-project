@@ -1,0 +1,10 @@
+# Go
+/bin/
+/dist/
+*.test
+*.out
+coverage.*
+vendor/
+.idea/
+.vscode/
+.env

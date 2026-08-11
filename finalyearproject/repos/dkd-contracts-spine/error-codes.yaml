@@ -1,0 +1,40 @@
+# Error-Code Taxonomy Registry. The GRAMMAR + rules are canonical (EF §7.7 / api-guidelines §7.7).
+# Concrete <category>/<reason> codes are NOT enumerated in the frozen canon verbatim -> NEEDS-INFO
+# (Phase 2). Machine-artifact (Header Profile, ADR-021). No code invented.
+header:
+  id: error-codes-registry
+  title: DOKANDAR Error-Code Taxonomy
+  layer: L2
+  taxonomy: T7
+  doc_class: contracts
+  owner: api-governance-board + platform
+  classification: Internal
+  status: Draft
+  version: 1.0.0
+  trace: [EF§7.7, EF§7.6, R6, ADR-021]
+  last_verified: { date: 2026-06-29, source_commit: PENDING }
+  source: dkd-platform-docs/standards/api-guidelines.md §7.6-§7.7 (EF §7)
+
+taxonomy:
+  format: "dokandar.<context>.<category>.<reason>"
+  carrier: "RFC-7807 problem+json in the `error` field of the response envelope {success,data,error,meta}"
+  rules:
+    - "hierarchical, stable codes; never change a published code (EF §7.7.2)"
+    - "no internal/stack leakage in the problem body (EF §7.7.3)"
+    - "<context> MUST be one of the canonical context slugs below (or 'edge')"
+  # Canonical context slugs for the <context> segment (the 13 contexts + edge tier).
+  context_slugs: [identity, catalog, custody, provenance, inventory, b2c, b2b, finance,
+                  logistics, fraud, government, analytics, platform, edge]
+
+edge_grpc_mapping:
+  rule: "edge maps gRPC status -> problem+json via the fixed table EF §7.6.1"
+  table: NEEDS-INFO   # transcribe the EF §7.6.1 status->problem table verbatim in Phase 2
+
+# Concrete codes are enumerated per-context in Phase 2. Each entry, when added, MUST match
+# `format` and use a valid context_slug; the validator enforces this on any present code.
+categories: NEEDS-INFO   # the <category> enumeration (api-guidelines §7.7.2) — not transcribed verbatim
+codes: []                # e.g. { code: dokandar.finance.idempotency.duplicate_key, http: 409 } — Phase 2
+
+needs_info:
+  - "The <category> set and the concrete <reason> codes per context (api-guidelines §7.7.2) — Phase 2."
+  - "The gRPC-status -> problem+json mapping table (EF §7.6.1) — Phase 2."

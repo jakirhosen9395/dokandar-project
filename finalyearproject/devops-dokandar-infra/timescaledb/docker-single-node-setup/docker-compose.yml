@@ -1,0 +1,47 @@
+# TimescaleDB (PostgreSQL 17 + time-series extension) — single node, Docker Compose.
+#
+# HOW TO READ THIS FILE (Docker day 1):
+#   TimescaleDB IS PostgreSQL with an extension pre-installed, so this file looks
+#   almost identical to the postgresql utility. Host port is 5433 because plain
+#   PostgreSQL owns 5432 on this server.
+# Every ${...} value comes from the .env file next to this compose file.
+
+name: dki-timescaledb
+
+services:
+  timescaledb:
+    image: timescale/timescaledb:${TSDB_VERSION:-2.28.2-pg17}
+    container_name: dki_timescaledb
+    restart: unless-stopped
+    # Give the process 30s to shut down CLEANLY on stop/restart (default 10s
+    # SIGKILLs databases mid-write and causes 'unclean shutdown' recovery).
+    stop_grace_period: 30s
+
+    environment:
+      POSTGRES_USER: ${TSDB_USER:-dki}
+      POSTGRES_PASSWORD: ${TSDB_PASSWORD:?empty password - run setup_env.sh first}
+      POSTGRES_DB: ${TSDB_DB:-dki_metrics}
+      PGDATA: /var/lib/postgresql/data/pgdata
+
+    # Cap the container's RAM (mandatory — host stability).
+    mem_limit: ${TSDB_MEM_LIMIT:-1g}
+
+    ports:
+      - "${TSDB_PORT:-5433}:5432"
+
+    volumes:
+      - type: bind
+        source: ${DATA_ROOT:-/data/dki}/timescaledb
+        target: /var/lib/postgresql/data
+        bind: { create_host_path: true }
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+networks:
+  default:
+    name: dki_timescaledb_net

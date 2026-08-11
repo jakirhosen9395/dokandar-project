@@ -1,0 +1,14 @@
+{
+  "name": "b2c-order-svc",
+  "version": "0.1.0",
+  "description": "DOKANDAR Context #6 B2C Marketplace — order service",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix sdk run build && tsc -p tsconfig.json",
+    "start": "node dist/src/index.js",
+    "test": "npm run build && node --test \"dist/test/**/*.test.js\""
+  },
+  "dependencies": { "@dokandar/platform-sdk": "file:sdk", "pg": "^8.13.1", "kafkajs": "^2.2.4", "kafkajs-snappy": "^1.1.0" },
+  "devDependencies": { "typescript": "^5.7.0", "@types/node": "^24.0.0", "@types/pg": "^8.11.10" }
+}

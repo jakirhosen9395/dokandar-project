@@ -1,0 +1,57 @@
+# MongoDB 8 — single node, Docker Compose, root auth ON.
+#
+# HOW TO READ THIS FILE (Docker day 1):
+#   environment: = the mongo image reads MONGO_INITDB_ROOT_* ONCE, on first start
+#                  (empty data dir), and creates the root user with that password.
+#   ports:       = this machine's 27017 -> Mongo's default 27017.
+#   volumes:     = TWO host directories: the data files and the config server files.
+#   healthcheck: = `db.runCommand({ping:1})` inside mongosh must answer ok.
+# Every ${...} value comes from the .env file next to this compose file.
+
+name: dki-mongodb
+
+services:
+  mongo:
+    # Official MongoDB image; the live platform runs major version 8.
+    image: mongo:${MONGO_VERSION:-7.0.37}
+    container_name: dki_mongo
+    restart: unless-stopped
+    # Give the process 30s to shut down CLEANLY on stop/restart (default 10s
+    # SIGKILLs databases mid-write and causes 'unclean shutdown' recovery).
+    stop_grace_period: 30s
+
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-dki}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?empty password - run setup_env.sh first}
+
+    # Cap the container's RAM (WiredTiger cache is sized inside this budget).
+    mem_limit: ${MONGO_MEM_LIMIT:-1g}
+
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+
+    # Bind mounts: database files + config files live on the host (survive `down -v`).
+    volumes:
+      - type: bind
+        source: ${DATA_ROOT:-/data/dki}/mongodb/db
+        target: /data/db
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ${DATA_ROOT:-/data/dki}/mongodb/configdb
+        target: /data/configdb
+        bind:
+          create_host_path: true
+
+    # Ready = the server answers a ping. --quiet keeps the probe cheap; generous
+    # timeout/retries so a busy moment never flaps the health state.
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+networks:
+  default:
+    name: dki_mongodb_net

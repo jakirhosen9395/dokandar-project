@@ -1,0 +1,67 @@
+# Canonical Identifier Registry — transcribed VERBATIM from DOKANDAR-Domain-Model.md
+# "Type Conventions" + "Ordering keys". Machine-artifact (Header Profile, ADR-021).
+# No value invented; anything not verbatim in canon is marked NEEDS-INFO. R7: imported, never forked.
+header:
+  id: ids-registry
+  title: DOKANDAR Canonical Identifier & Type Registry
+  layer: L2
+  taxonomy: T7
+  doc_class: contracts
+  owner: identity-kyc + event-spine-board
+  classification: Internal
+  status: Draft
+  version: 1.0.0
+  trace: [DM§"Type Conventions", DM§"Ordering keys", R7, R6, ADR-016]
+  last_verified: { date: 2026-06-29, source_commit: PENDING }
+  source: DOKANDAR-Domain-Model.md lines 59-74, 295
+
+# Cross-cutting primitive types (DM Type Conventions; lint-enforced fleet-wide, EF §5 C6).
+types:
+  money:     { repr: int64, unit: poisha, banned: "float|decimal|string", note: "Integer poisha only (DM)" }
+  timestamp: { repr: int64, unit: unix-milliseconds, tz: UTC, note: "DM" }
+  uuid:      { repr: string, spec: "UUIDv7 (RFC 9562, time-ordered)", note: "DM 'IDs ... UUID v7 unless prefixed format below'" }
+  integer_encoding: "decimal; no leading zeros, no decimal point, no exponent, no quotes (DM §Integer-encoding)"
+
+# Prefixed canonical identifiers. `body: uuid7` means the suffix is a UUIDv7 (per DM).
+# owner_ctx = the single issuing/owning bounded context (1..13). Imported, never forked (R7).
+identifiers:
+  - { id: DID,  prefix: "did:dokandar:", body: uuid7, immutable: true, owner_ctx: 1, trace: 'DM "DID"' }
+  - { id: PPID, prefix: "PP-",   body: uuid7, owner_ctx: 3, trace: 'DM "PPID"' }
+  - { id: GPID, prefix: "GP-",   body: "{categoryCode}-{uuid7}", owner_ctx: 2, trace: 'DM "GPID"' }
+  - { id: ORD,  prefix: "ORD-",  body: uuid7, owner_ctx: 6, trace: 'DM "ORD"' }
+  - { id: TRD,  prefix: "TRD-",  body: uuid7, owner_ctx: 7, trace: 'DM "TRD"' }
+  - { id: WLT,  prefix: "WLT-",  body: uuid7, owner_ctx: 8, trace: 'DM "WLT"' }
+  - { id: ESC,  prefix: "ESC-",  body: uuid7, owner_ctx: 8, trace: 'DM "ESC"' }
+  - { id: TXN,  prefix: "TXN-",  body: uuid7, owner_ctx: 8, trace: 'DM "TXN"' }
+  - { id: SHP,  prefix: "SHP-",  body: uuid7, owner_ctx: 9, trace: 'DM "SHP"' }
+  - { id: NTF,  prefix: "NTF-",  body: uuid7, owner_ctx: 13, trace: 'DM "NTF"' }
+  - { id: MFSA, prefix: "MFSA-", body: uuid7, owner_ctx: 8, trace: 'DM "MFSA"' }
+
+# PII identifiers — stored ONLY inside Identity (#1); never in event payloads (R6 no-PII).
+pii_identifiers:
+  - { id: Phone,   format: "E.164 +880XXXXXXXXXX", trace: 'DM "Phone"' }
+  - { id: NIDHash, format: "SHA-256(rawNID)", note: "raw NID is NEVER stored", trace: 'DM "NIDHash"' }
+
+# Per-aggregate Kafka ordering keys (DM §"Ordering keys"; mirrored in messaging.yaml).
+ordering_keys:
+  custody:        PPID    # exceptions: ProductRecalled.v1 -> recallId; CustodySplit -> parentPpid; CustodyMerged -> newPpid
+  finance_wallet: WLT
+  finance_escrow: ESC
+  finance_mfs:    TXN
+  b2c:            ORD
+  b2b:            TRD
+  identity:       DID
+  catalog:        GPID
+  logistics:      SHP
+  fraud:          DID
+  government:     [recallId, directiveId]
+
+# Routing keys that are NOT standalone aggregate IDs (used as Kafka partition keys only).
+routing_keys:
+  - { id: recallId,    used_by: "custody.passport.ProductRecalled.v1, government.oversight.RecallDirectiveIssued.v1" }
+  - { id: directiveId, used_by: "government.oversight.TradeFreezeDirective.v1 / WalletFreezeDirective.v1" }
+  - { id: parentPpid,  used_by: "custody.passport.CustodySplit.v1" }
+  - { id: newPpid,     used_by: "custody.passport.CustodyMerged.v1" }
+
+needs_info:
+  - "DM specifies the body as {uuid7} (RFC 9562) but illustrative examples use a short Crockford-base32 form; the exact example charset is to be reconciled in Phase 2 (does not change the canonical {uuid7} rule)."

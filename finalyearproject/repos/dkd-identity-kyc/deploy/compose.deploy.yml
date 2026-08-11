@@ -1,0 +1,22 @@
+# identity-svc deployment on the Business Service Host (S3). Connects to the SHARED infra on S2
+# via env only (Kubernetes-ready: these env names become the k8s ConfigMap/Secret). NO infra here.
+# Secrets are injected via .env.deploy (generated at deploy time from the S2 secret set; gitignored).
+name: dokandar-identity
+
+services:
+  identity-svc:
+    image: identity-svc:local
+    container_name: identity-svc
+    restart: unless-stopped
+    env_file:
+      - .env.deploy
+    ports:
+      - "8080:8080"   # REST (HTTP/1.1)
+      - "8081:8081"   # gRPC OHS (HTTP/2 cleartext)
+      - "9090:9090"   # Prometheus metrics
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s

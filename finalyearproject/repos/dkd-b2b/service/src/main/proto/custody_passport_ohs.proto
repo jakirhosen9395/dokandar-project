@@ -1,0 +1,17 @@
+syntax = "proto3";
+package dokandar.custody.ohs.v1;
+option java_multiple_files = true;
+option java_package = "com.dokandar.custody.ohs.v1";
+option java_outer_classname = "CustodyPassportOhsProto";
+
+service CustodyPassportOhs {
+  rpc GetPassport (GetPassportRequest) returns (PassportReply);
+}
+message GetPassportRequest { string ppid = 1; }
+message PassportReply {
+  bool   found          = 1;
+  string ppid           = 2;
+  string gpid           = 3;
+  string current_holder = 4;
+  string status         = 5;
+}

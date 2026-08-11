@@ -1,0 +1,19 @@
+# APM Server config (mounted read-only into the container).
+# ${VARS} here are resolved by apm-server AT RUNTIME from its container env.
+apm-server:
+  host: "0.0.0.0:8200"
+  auth:
+    # every agent MUST present this token; anonymous access is explicitly off
+    # (RUM would otherwise silently enable it and accept unauthenticated events)
+    secret_token: "${APM_SECRET_TOKEN}"
+    anonymous:
+      enabled: false
+
+output.elasticsearch:
+  hosts: ["elasticsearch:9200"]
+  username: "elastic"
+  password: "${ELASTIC_PASSWORD}"
+
+logging.level: warning
+logging.to_stderr: true
+logging.to_files: false

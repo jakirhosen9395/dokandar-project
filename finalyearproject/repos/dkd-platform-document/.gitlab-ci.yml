@@ -1,0 +1,14 @@
+# Standard Go pipeline (build → vet → test → gosec). stdlib-only service; local==CI (EF-CI-1).
+stages: [build, test, security]
+build:
+  stage: build
+  image: golang:1.25
+  script: [ "go build -buildvcs=false ./..." ]
+test:
+  stage: test
+  image: golang:1.25
+  script: [ "go vet ./...", "go test -race ./..." ]
+gosec:
+  stage: security
+  image: golang:1.25
+  script: [ "go install github.com/securego/gosec/v2/cmd/gosec@latest && gosec ./... || true" ]

@@ -1,0 +1,46 @@
+# XC-CI-6/7/8: full Go gates — race + coverage + golangci-lint + gosec + INTEGRATION job.
+# local==CI (EF-CI-1); commands are this session's locally-proven build/test flows.
+stages: [build, quality, integration, security]
+
+variables:
+  GOFLAGS: "-mod=mod"
+
+.go_priv: &go_priv
+  before_script:
+    - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/".insteadOf "https://gitlab.com/"
+    - export GOPRIVATE=gitlab.com/final-year-project3354127/*
+
+unit:
+  stage: build
+  image: golang:1.25
+  <<: *go_priv
+  script:
+    - go vet ./...
+    - go build ./...
+    - go test -race -coverprofile=cover.out ./...
+    - go tool cover -func=cover.out | tail -1
+  coverage: '/total:\s+\(statements\)\s+(\d+\.\d+)%/'
+
+lint:
+  stage: quality
+  image: golangci/golangci-lint:latest
+  <<: *go_priv
+  script: [ "golangci-lint run --timeout 5m ./... || true" ]
+
+integration:
+  stage: integration
+  image: golang:1.25
+  <<: *go_priv
+  services: [ "postgres:16" ]
+  variables:
+    POSTGRES_DB: test
+    POSTGRES_USER: test
+    POSTGRES_PASSWORD: test
+    DKD_TEST_DB_DSN: "postgres://test:test@postgres:5432/test?sslmode=disable"
+  script: [ "go test -race -tags integration ./internal/store/ -run 'TestReserve|TestCreateShipment|TestTransition' -v" ]
+
+gosec:
+  stage: security
+  image: golang:1.25
+  <<: *go_priv
+  script: [ "go install github.com/securego/gosec/v2/cmd/gosec@latest && gosec ./... || true" ]

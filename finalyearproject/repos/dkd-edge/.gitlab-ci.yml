@@ -1,0 +1,15 @@
+# XC-CI-2: edge pipeline — Go gateway build + Node BFF build/test (both locally-proven).
+stages: [build, test]
+gateway-build:
+  stage: build
+  image: golang:1.25
+  script: [ "cd gateway && go build -buildvcs=false ./..." ]
+bff-build:
+  stage: build
+  image: node:22-bookworm-slim
+  script:
+    - for d in app-bff ussd-ivr-bff offline-sync-gateway; do (cd $d && npm ci --no-audit --no-fund && npx tsc -p tsconfig.json); done
+ussd-test:
+  stage: test
+  image: node:22-bookworm-slim
+  script: [ "cd ussd-ivr-bff && npm ci --no-audit --no-fund && npm test" ]

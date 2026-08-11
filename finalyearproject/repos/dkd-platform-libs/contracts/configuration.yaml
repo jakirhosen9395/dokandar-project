@@ -1,0 +1,42 @@
+# Configuration & Operational-Constants Registry. ONLY constants/strategies that are NAMED in the
+# frozen canon are recorded here (each with its source). Anything not in canon = NEEDS-INFO.
+# Machine-artifact (Header Profile, ADR-021). No value invented.
+header:
+  id: configuration-registry
+  title: DOKANDAR Configuration & Operational Constants
+  layer: L2
+  taxonomy: T7
+  doc_class: contracts
+  owner: platform + finance + inventory boards
+  classification: Internal
+  status: Draft
+  version: 1.0.0
+  trace: [DM, SA§27, SYS§config, R1, R2, ADR-024]
+  last_verified: { date: 2026-06-29, source_commit: PENDING }
+  source: DOKANDAR-Domain-Model.md (escrow/cooling-off/NIL), SA Ch.27, SYS config/secrets
+
+# Canon-named constants (each value is verbatim from the cited source — NOT a tunable invented here).
+constants:
+  - { id: COOLING_OFF_WINDOW, value_ms: 259200000, human: "72h", scope: "finance.escrow",
+      rule: "On EscrowReleased, seller credit isWithdrawable=false; coolingOffExpiresAt = now + 72h",
+      configurable: false, trace: 'DM §Cooling-Off (Ch.27.4)' }
+  - { id: ESCROW_ABANDON_TTL, value_ms: 604800000, human: "7d", scope: "finance.escrow",
+      rule: "EscrowExpired when now > createdAt + ESCROW_ABANDON_TTL AND Escrow ACTIVE",
+      configurable: "operator-configurable per Escrow.referenceType", trace: 'DM §EscrowExpired (ESCROW_ABANDON_TTL = 7 days)' }
+  - { id: NIL_ROLLUP_MAX_LAG, value_ms: 60000, human: "60s", scope: "inventory.nil",
+      rule: "national stock rollup lag ceiling; reservation-critical reads use strong-LOCAL stock, never the rollup",
+      configurable: false, trace: 'BA G4 / R1 / ADR-003; DM NILRollup.lagMs' }
+  - { id: B2B_DELIVERY_MIN_LEAD, value_ms: 86400000, human: "24h", scope: "b2b.contractterms",
+      rule: "deliveryDeadlineAt must be > createdAt + 86400000", configurable: false, trace: 'DM ContractTerms' }
+  - { id: MONEY_CUSTODY_RPO, value: 0, scope: "finance+custody",
+      rule: "synchronous two-region in-country quorum; RPO=0 for money/custody WAL (production gate)",
+      configurable: false, trace: 'SA Ch.27.2' }
+
+# Config & secret strategy (principles only; concrete values are per-environment).
+strategy:
+  config_model: "12-factor: environment + sovereign secret manager (SYS config/secrets)."
+  secrets: "KMS/HSM-backed only; no plaintext secrets in repo or image; per-context credentials; Finance creds isolated (R2)."
+  fyp_note: "Per ADR-024 the FYP uses GitLab CI/CD variables with SYNTHETIC credentials only; production HSM/PKI are seam-stubs (SYS §13 NOT BUILT)."
+
+needs_info:
+  - "Exhaustive per-service tunables (rate limits, retry/backoff, DLQ caps, SLO thresholds, pool sizes) — Phase 2, transcribed from SA/SYS per service. Not invented here."

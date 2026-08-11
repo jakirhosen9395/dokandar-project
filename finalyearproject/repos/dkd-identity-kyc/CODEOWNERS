@@ -1,0 +1,4 @@
+# CODEOWNERS — dkd-identity-kyc
+# FYP: single owner; four-eyes (R4) relaxed to self-approval per ADR-024 §3.
+# Structure preserved so future team mapping needs no rename (EF §17.4 NEVER-SAME-TEAM).
+* @jakirhosen9395

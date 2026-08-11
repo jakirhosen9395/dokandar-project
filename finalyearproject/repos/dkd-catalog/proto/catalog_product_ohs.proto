@@ -1,0 +1,27 @@
+// catalog-product-ohs (R7 master-data OHS). The Product read-model resolver over gRPC — the internal
+// plane other contexts use to resolve a GPID to its canonical product (never a local fork of GPID).
+syntax = "proto3";
+
+package dokandar.catalog.ohs.v1;
+option go_package = "gitlab.com/final-year-project3354127/catalog-svc/internal/grpcohs/pb";
+
+service CatalogProductOhs {
+  // Resolve the canonical product read-model for a GPID.
+  rpc ResolveProduct (ResolveProductRequest) returns (ProductReply);
+}
+
+message ResolveProductRequest { string gpid = 1; }
+
+message ProductReply {
+  bool     found         = 1;
+  string   gpid          = 2;
+  repeated string category_path = 3;
+  string   names_bn      = 4;
+  string   names_en      = 5;
+  string   base_unit     = 6;
+  string   status        = 7;   // DRAFT|PUBLISHED|DEPRECATED
+  string   created_by    = 8;
+  int64    created_at    = 9;
+  int64    updated_at    = 10;
+  int64    version       = 11;
+}

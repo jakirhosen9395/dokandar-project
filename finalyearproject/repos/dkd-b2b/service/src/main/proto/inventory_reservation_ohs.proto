@@ -1,0 +1,14 @@
+syntax = "proto3";
+package dokandar.inventory.ohs.v1;
+option java_multiple_files = true;
+option java_package = "com.dokandar.inventory.ohs.v1";
+option java_outer_classname = "InventoryReservationOhsProto";
+
+service InventoryReservationOhs {
+  rpc Reserve    (ReserveRequest)    returns (ReserveReply);
+  rpc Transition (TransitionRequest) returns (TransitionReply);
+}
+message ReserveRequest    { string idempotency_key = 1; string gpid = 2; string holder = 3; int64 quantity = 4; }
+message ReserveReply      { bool ok = 1; string res_id = 2; bool insufficient_stock = 3; }
+message TransitionRequest { string res_id = 1; string to = 2; }
+message TransitionReply   { bool ok = 1; bool not_found = 2; string state = 3; }

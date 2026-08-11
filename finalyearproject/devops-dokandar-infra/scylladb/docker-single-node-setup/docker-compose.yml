@@ -1,0 +1,49 @@
+# ScyllaDB — single node, Docker Compose. A Cassandra-compatible wide-column store.
+#
+# HOW TO READ THIS FILE (Docker day 1):
+#   command: flags KEEP SCYLLA SMALL — developer-mode skips host tuning, --smp 1
+#   uses one CPU core, --memory caps its RAM (Scylla normally grabs everything).
+#   Port 9042 is CQL — you talk to it with cqlsh, like SQL for Cassandra.
+#   No auth by default (learning utility; the SG is the fence).
+# Every ${...} value comes from the .env file next to this compose file.
+
+name: dki-scylladb
+
+services:
+  scylla:
+    image: scylladb/scylla:${SCYLLA_VERSION:-2025.1.14}
+    container_name: dki_scylla
+    restart: unless-stopped
+    # Give the process 30s to shut down CLEANLY on stop/restart (default 10s
+    # SIGKILLs databases mid-write and causes 'unclean shutdown' recovery).
+    stop_grace_period: 30s
+
+    # The caps that make Scylla a polite neighbour on an 8GB box.
+    # NOTE: seastar computes its own "available" budget (~500MB here) independent of the
+    # cgroup — 750M failed with "insufficient physical memory"; 350M fits a learning node.
+    command: ["--developer-mode", "1", "--smp", "1", "--memory", "${SCYLLA_MEMORY:-350M}",
+              "--overprovisioned", "1", "--cluster-name", "dki"]
+
+    # Container-level cap ABOVE scylla's own --memory — seastar needs ~2x headroom
+    # (750M heap failed inside an 1100m cgroup with 'insufficient physical memory').
+    mem_limit: ${SCYLLA_MEM_LIMIT:-1500m}
+
+    ports:
+      - "${SCYLLA_CQL_PORT:-9042}:9042"
+
+    volumes:
+      - type: bind
+        source: ${DATA_ROOT:-/data/dki}/scylladb
+        target: /var/lib/scylla
+        bind: { create_host_path: true }
+
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'SELECT release_version FROM system.local' >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 45s
+
+networks:
+  default:
+    name: dki_scylladb_net

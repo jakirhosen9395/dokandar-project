@@ -1,0 +1,108 @@
+# service-template CI — validates the scaffolder + EVERY runtime template by GENERATING sample
+# services and building/testing them against the real dkd-platform-libs v1.0.0, then verifying the
+# deployment artifacts (Helm render, Dockerfile lint). All five runtimes are BLOCKING gates.
+# Toolchains: latest 2026 stable. Trace: ADR-011, R6/R7.
+stages: [test, generate, build, deploy-verify]
+
+
+scaffold:tests:
+  stage: test
+  image: python:3.13-slim
+  before_script:
+    - pip install --quiet --disable-pip-version-check pytest
+  script:
+    - cd scaffold && python -m pytest tests/ -q
+
+generate:samples:
+  stage: generate
+  image: python:3.13-slim
+  script:
+    - cd scaffold
+    - 'for rt in go java csharp python node; do python -m dkdscaffold new-service --name sample-$rt-svc --context catalog --lang $rt --out ../generated; done'
+    - 'echo generated:; ls ../generated'
+  artifacts:
+    paths: [generated/]
+    expire_in: 2 hours
+
+# ---- per-runtime BUILD + TEST against the real SDK (clone v1.0.0 + local-link). All blocking. ----
+sample:go:
+  stage: build
+  image: golang:1.25
+  needs: [generate:samples]
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq git >/dev/null
+    - git clone --depth 1 --branch v1.8.0 "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/final-year-project3354127/dkd-platform-libs.git" /tmp/libs
+  script:
+    - cd generated/sample-go-svc
+    - go mod edit -replace gitlab.com/final-year-project3354127/dkd-platform-libs/sdk/go=/tmp/libs/sdk/go
+    - go mod tidy
+    - go vet ./... && go build ./... && go test ./...
+
+sample:node:
+  stage: build
+  image: node:24
+  needs: [generate:samples]
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq git >/dev/null
+    - git clone --depth 1 --branch v1.8.0 "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/final-year-project3354127/dkd-platform-libs.git" /tmp/libs
+    - cd /tmp/libs/sdk/typescript && npm install --no-audit --no-fund --silent && npm run build && cd -
+  script:
+    - cd generated/sample-node-svc
+    - npm install --no-audit --no-fund --silent /tmp/libs/sdk/typescript
+    - npm install --no-audit --no-fund --silent
+    - npm run build && npm test
+
+sample:python:
+  stage: build
+  image: python:3.13-slim
+  needs: [generate:samples]
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq git >/dev/null
+    - git clone --depth 1 --branch v1.8.0 "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/final-year-project3354127/dkd-platform-libs.git" /tmp/libs
+  script:
+    - pip install --quiet /tmp/libs/sdk/python fastapi "uvicorn[standard]" pytest httpx
+    - cd generated/sample-python-svc && pip install --quiet -e . && python -m pytest -q
+
+sample:java:
+  stage: build
+  image: maven:3.9-eclipse-temurin-21
+  needs: [generate:samples]
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq git >/dev/null
+    - git clone --depth 1 --branch v1.8.0 "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/final-year-project3354127/dkd-platform-libs.git" /tmp/libs
+    - cd /tmp/libs/sdk/java && mvn -q -B -DskipTests install && cd -
+  script:
+    - cd generated/sample-java-svc && mvn -q -B test
+
+sample:csharp:
+  stage: build
+  image: mcr.microsoft.com/dotnet/sdk:10.0
+  needs: [generate:samples]
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq git >/dev/null
+    - git clone --depth 1 --branch v1.8.0 "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/final-year-project3354127/dkd-platform-libs.git" /tmp/libs
+  script:
+    - cd generated/sample-csharp-svc
+    # local-link the real SDK (same mechanism as go/java/node/python): swap the NuGet PackageReference
+    # for a ProjectReference to the cloned SDK project, then build+test.
+    - 'find . -name "*.csproj" -exec sed -i -E "s#<PackageReference Include=\"Dkd.Platform\"[^>]*/>#<ProjectReference Include=\"/tmp/libs/sdk/csharp/Dkd.Platform/Dkd.Platform.csproj\" />#g" {} +'
+    - dotnet test
+
+# ---- deployment-artifact verification (Helm render + Dockerfile lint) for ALL runtimes ----
+helm:render:
+  stage: deploy-verify
+  image:
+    name: alpine/helm:3.16.3
+    entrypoint: [""]
+  needs: [generate:samples]
+  script:
+    - 'for rt in go java csharp python node; do echo "== helm template sample-$rt-svc =="; helm template sample-$rt-svc generated/sample-$rt-svc/deploy/helm/sample-$rt-svc >/dev/null && echo OK; done'
+
+dockerfile:lint:
+  stage: deploy-verify
+  image:
+    name: hadolint/hadolint:latest-debian
+    entrypoint: [""]
+  needs: [generate:samples]
+  script:
+    - 'for rt in go java csharp python node; do echo "== hadolint sample-$rt-svc =="; hadolint --failure-threshold error generated/sample-$rt-svc/Dockerfile && echo OK; done'

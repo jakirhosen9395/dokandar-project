@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dkdgen"
+version = "1.0.0"
+description = "DOKANDAR platform SDK generator — single canonical generator over the frozen contracts"
+requires-python = ">=3.10"
+license = {text = "Proprietary"}
+dependencies = ["pyyaml>=6"]
+
+[project.scripts]
+dkdgen = "dkdgen.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["dkdgen*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

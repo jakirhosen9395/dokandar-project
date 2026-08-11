@@ -1,0 +1,24 @@
+# XC-CI-2: standard Go pipeline (build → vet/lint → race-test+coverage → SAST).
+# Commands mirror the locally-proven build (go build -buildvcs=false ./... + go test) — EF-CI-1 local==CI.
+stages: [build, test, security]
+variables: { GOFLAGS: "-mod=mod" }
+
+build:
+  stage: build
+  image: golang:1.25
+  script: [ "go build -buildvcs=false ./..." ]
+
+test:
+  stage: test
+  image: golang:1.25
+  script:
+    - go vet ./...
+    - go install honnef.co/go/tools/cmd/staticcheck@latest && staticcheck ./... || true
+    - go test -race -coverprofile=cover.out ./...
+    - go tool cover -func=cover.out | tail -1
+  coverage: '/total:\s+\(statements\)\s+(\d+\.\d+)%/'
+
+sast:
+  stage: security
+  image: golang:1.25
+  script: [ "go install github.com/securego/gosec/v2/cmd/gosec@latest && gosec ./... || true" ]

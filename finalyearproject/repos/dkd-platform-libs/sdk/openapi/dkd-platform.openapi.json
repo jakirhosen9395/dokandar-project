@@ -1,0 +1,391 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "DOKANDAR Platform — Operational & Cross-Cutting API",
+    "version": "1.0.0",
+    "description": "Contract-derived OpenAPI for the DOKANDAR platform. Specifies the universal operational endpoints every service exposes and the cross-cutting components mandated by the architecture (response envelope, RFC-7807 problem details, cursor pagination, bearer-JWT security, idempotency + correlation headers, int64 money/time). Per-context business /v1 endpoints and OHS gRPC signatures are NEEDS-INFO in the frozen contracts (api-registry.yaml: 'No endpoint invented', Phase-2) and are intentionally NOT enumerated here — see x-dkd-deferred. Generated from dkd-contracts-spine@1.0.0; never hand-edited.",
+    "x-dkd-generator": "dkdgen",
+    "x-dkd-generator-version": "1.0.0",
+    "x-dkd-contract-version": "1.0.0",
+    "x-dkd-build-time": "2026-06-29T00:00:00Z",
+    "x-dkd-build-commit": "source"
+  },
+  "servers": [
+    {
+      "url": "/v1",
+      "description": "External REST surface via api-gateway / BFFs (api-registry: versioned /v1)."
+    }
+  ],
+  "tags": [
+    {
+      "name": "operational",
+      "description": "Universal health/version endpoints implemented by the golden service template."
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "getHealth",
+        "tags": [
+          "operational"
+        ],
+        "summary": "Health probe",
+        "description": "Universal operational endpoint implemented by the golden service template.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Service healthy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC-7807 problem+json.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ready": {
+      "get": {
+        "operationId": "getReady",
+        "tags": [
+          "operational"
+        ],
+        "summary": "Readiness probe",
+        "description": "Universal operational endpoint implemented by the golden service template.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Service ready (dependencies reachable).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC-7807 problem+json.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/live": {
+      "get": {
+        "operationId": "getLive",
+        "tags": [
+          "operational"
+        ],
+        "summary": "Liveness probe",
+        "description": "Universal operational endpoint implemented by the golden service template.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Service alive.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC-7807 problem+json.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/version": {
+      "get": {
+        "operationId": "getVersion",
+        "tags": [
+          "operational"
+        ],
+        "summary": "Build/contract version",
+        "description": "Universal operational endpoint implemented by the golden service template.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "contractVersion + sdkGenerator (consumed from dkd-platform).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseEnvelope"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC-7807 problem+json.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Platform JWT (verified via Identity OHS JWKS). Required on all non-operational routes."
+      }
+    },
+    "parameters": {
+      "Cursor": {
+        "name": "cursor",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Opaque forward cursor. Cursor pagination only — offset is banned."
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "minimum": 1
+        },
+        "description": "Page size."
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Mandatory on unsafe/money/custody writes; deduped via the inbox."
+      },
+      "CorrelationId": {
+        "name": "X-Correlation-Id",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string"
+        },
+        "description": "W3C-traceparent-derived correlation id; echoed in logs."
+      }
+    },
+    "schemas": {
+      "ResponseEnvelope": {
+        "type": "object",
+        "description": "Mandatory response envelope {success,data,error,meta} (API convention).",
+        "required": [
+          "success"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "description": "Payload on success; null on error."
+          },
+          "error": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProblemDetails"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        }
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "description": "RFC-7807 problem detail. 'code' follows the taxonomy dokandar.<context>.<category>.<reason>.",
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "format": "uri"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^dokandar\\.[a-z]+\\.[a-z0-9_]+\\.[a-z0-9_]+$"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "instance": {
+            "type": "string"
+          },
+          "traceId": {
+            "type": "string"
+          }
+        }
+      },
+      "Meta": {
+        "type": "object",
+        "properties": {
+          "pagination": {
+            "$ref": "#/components/schemas/PageInfo"
+          }
+        }
+      },
+      "PageInfo": {
+        "type": "object",
+        "description": "Cursor pagination metadata.",
+        "properties": {
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ErrorContextSlug": {
+        "type": "string",
+        "enum": [
+          "identity",
+          "catalog",
+          "custody",
+          "provenance",
+          "inventory",
+          "b2c",
+          "b2b",
+          "finance",
+          "logistics",
+          "fraud",
+          "government",
+          "analytics",
+          "platform",
+          "edge"
+        ],
+        "description": "Bounded-context slug in the error-code taxonomy (error-codes.yaml)."
+      },
+      "Money": {
+        "type": "integer",
+        "format": "int64",
+        "description": "Integer poisha (int64). Float/decimal/string money is banned."
+      },
+      "TimestampMs": {
+        "type": "integer",
+        "format": "int64",
+        "description": "Unix epoch milliseconds, UTC (int64)."
+      }
+    }
+  },
+  "x-dkd-ohs-services": [
+    {
+      "id": "identity-party-ohs",
+      "ownerContext": 1,
+      "ownerContextName": "identity",
+      "protocol": "gRPC",
+      "operations": [],
+      "protoStatus": "NEEDS-INFO"
+    },
+    {
+      "id": "catalog-product-ohs",
+      "ownerContext": 2,
+      "ownerContextName": "catalog",
+      "protocol": "gRPC",
+      "operations": [],
+      "protoStatus": "NEEDS-INFO"
+    },
+    {
+      "id": "inventory-ohs",
+      "ownerContext": 5,
+      "ownerContextName": "inventory",
+      "protocol": "gRPC",
+      "operations": [
+        "Reserve",
+        "Release",
+        "Confirm",
+        "GetLocalStock"
+      ],
+      "protoStatus": "NEEDS-INFO"
+    },
+    {
+      "id": "finance-ohs",
+      "ownerContext": 8,
+      "ownerContextName": "finance",
+      "protocol": "gRPC",
+      "operations": [
+        "HoldEscrow",
+        "ApplyFraudHold",
+        "PostSubsidy",
+        "QuoteSettlement"
+      ],
+      "protoStatus": "NEEDS-INFO"
+    },
+    {
+      "id": "platform-ohs",
+      "ownerContext": 13,
+      "ownerContextName": "platform",
+      "protocol": "gRPC",
+      "operations": [],
+      "protoStatus": "NEEDS-INFO"
+    }
+  ],
+  "x-dkd-deferred": {
+    "rest_apis": "NEEDS-INFO",
+    "ohs_proto": "NEEDS-INFO",
+    "rationale": "Frozen contracts (api-registry.yaml) deliberately omit per-endpoint REST/proto signatures — 'No endpoint invented', Phase-2. Enumerating them would require fabrication, which platform governance (P2) forbids. They are intentionally deferred, not missing.",
+    "source": "dkd-contracts-spine/api-registry.yaml"
+  }
+}

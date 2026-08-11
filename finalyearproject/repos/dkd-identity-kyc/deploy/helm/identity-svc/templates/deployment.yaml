@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "identity-svc.fullname" . }}
+  labels: { app: identity-svc, context: identity }
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector: { matchLabels: { app: identity-svc } }
+  template:
+    metadata:
+      labels: { app: identity-svc, context: identity }
+      annotations: { prometheus.io/scrape: "true", prometheus.io/port: "{{ .Values.service.metricsPort }}" }
+    spec:
+      containers:
+        - name: identity-svc
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - { name: http, containerPort: {{ .Values.service.port }} }
+            - { name: metrics, containerPort: {{ .Values.service.metricsPort }} }
+          envFrom: [{ configMapRef: { name: {{ include "identity-svc.fullname" . }}-config } }]
+          livenessProbe:  { httpGet: { path: {{ .Values.probes.liveness }},  port: http }, initialDelaySeconds: 10 }
+          readinessProbe: { httpGet: { path: {{ .Values.probes.readiness }}, port: http }, initialDelaySeconds: 5 }
+          startupProbe:   { httpGet: { path: {{ .Values.probes.startup }},   port: http }, failureThreshold: 30, periodSeconds: 2 }
+          resources: {{ toYaml .Values.resources | nindent 12 }}

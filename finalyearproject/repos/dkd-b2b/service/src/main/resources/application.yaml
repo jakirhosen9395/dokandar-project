@@ -1,0 +1,55 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: b2b-trade-svc
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/dkd_b2b}
+    username: ${SPRING_DATASOURCE_USERNAME:dokandar}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    hikari:
+      maximum-pool-size: 10
+  jackson:
+    deserialization:
+      # integer poisha only — a float where a long is expected must be rejected, never truncated
+      accept-float-as-int: false
+  kafka:
+    bootstrap-servers: ${DKD_KAFKA_BROKERS:localhost:9092}
+    consumer:
+      group-id: b2b-trade-svc
+      enable-auto-commit: false
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        enable.idempotence: true
+    listener:
+      ack-mode: record
+
+management:
+  server:
+    port: 9090
+  endpoints:
+    web:
+      base-path: /
+      exposure:
+        include: prometheus,health
+      path-mapping:
+        prometheus: metrics
+
+springdoc:
+  swagger-ui:
+    path: /docs
+  api-docs:
+    path: /swagger/v1/swagger.json
+
+dkd:
+  margin-rate-bps: ${DKD_B2B_MARGIN_RATE_BPS:1000}
+  inventory-url: ${DKD_INVENTORY_URL:}
+  custody-url: ${DKD_CUSTODY_URL:}
+  build-info-path: ${DKD_BUILD_INFO_PATH:/app/build-info.properties}
