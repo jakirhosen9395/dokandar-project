@@ -1,0 +1,86 @@
+# Temporal — Docker Compose HA cluster: 1 PostgreSQL (the durable store) + 3 temporal-server nodes (all 4
+# roles each: frontend/history/matching/worker) sharing it. Temporal's services are stateless — HA comes
+# from the shared DB + the cluster_membership rings, so a 3-node cluster survives one node loss. node1 runs
+# schema setup (SKIP_*=false); nodes 2/3 skip it (the schema already exists). Per-node + PG data are HOST
+# bind mounts (survive `down -v`). + the companion temporalio/ui Web UI.
+x-temporal: &temporal
+  image: ${TEMPORAL_IMAGE:-temporalio/auto-setup:latest}
+  restart: always
+  environment: &tenv
+    DB: postgres12
+    DB_PORT: "5432"
+    POSTGRES_SEEDS: postgres
+    POSTGRES_USER: temporal
+    POSTGRES_PWD: ${PG_PASSWORD:?set in .env}
+    DBNAME: temporal
+    VISIBILITY_DBNAME: temporal_visibility
+    ENABLE_ES: "false"
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:16}
+    container_name: dokandar_temporal_pg
+    restart: always
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: ${PG_PASSWORD:?set in .env}
+    volumes:
+      - ${DATA_ROOT:-/data}/temporal_cluster/pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  temporal1:
+    <<: *temporal
+    container_name: dokandar_temporal_c1
+    hostname: temporal1
+    environment:
+      <<: *tenv
+      SKIP_SCHEMA_SETUP: "false"
+      SKIP_DB_CREATE: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${T_GRPC1:-7233}:7233"
+
+  temporal2:
+    <<: *temporal
+    container_name: dokandar_temporal_c2
+    hostname: temporal2
+    environment:
+      <<: *tenv
+      SKIP_SCHEMA_SETUP: "true"
+      SKIP_DB_CREATE: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${T_GRPC2:-7234}:7233"
+
+  temporal3:
+    <<: *temporal
+    container_name: dokandar_temporal_c3
+    hostname: temporal3
+    environment:
+      <<: *tenv
+      SKIP_SCHEMA_SETUP: "true"
+      SKIP_DB_CREATE: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${T_GRPC3:-7235}:7233"
+
+  ui:
+    image: ${TEMPORAL_UI_IMAGE:-temporalio/ui:latest}
+    container_name: dokandar_temporal_ui
+    restart: always
+    environment:
+      TEMPORAL_ADDRESS: temporal1:7233
+      TEMPORAL_UI_PUBLIC_PATH: ""
+    depends_on: [temporal1]
+    ports:
+      - "${T_UI:-8233}:8080"

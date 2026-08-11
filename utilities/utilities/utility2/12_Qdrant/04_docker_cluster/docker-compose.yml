@@ -1,0 +1,48 @@
+# Qdrant — Docker Compose HA cluster: 3 peers in one Raft consensus group. q1 bootstraps the cluster
+# (--uri), q2/q3 join it (--bootstrap). Collections created with shard_number + replication_factor spread
+# each shard across peers, so the cluster survives one node loss. Per-node storage = HOST bind mounts
+# (survive `down -v`). REST 6333 / gRPC 6334 / Raft-p2p 6335.
+x-qdrant: &q
+  image: ${QDRANT_IMAGE:-qdrant/qdrant:v1.18.2}
+  restart: always
+  environment:
+    QDRANT__CLUSTER__ENABLED: "true"
+    QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:?set in .env}
+
+services:
+  q1:
+    <<: *q
+    container_name: dokandar_qdrant_c1
+    hostname: q1
+    command: ["./qdrant", "--uri", "http://q1:6335"]
+    ports:
+      - "${Q_HTTP1:-6333}:6333"
+      - "${Q_GRPC1:-6334}:6334"
+    volumes:
+      - type: bind
+        source: ${DATA_ROOT:-/data}/qdrant_cluster/n1
+        target: /qdrant/storage
+  q2:
+    <<: *q
+    container_name: dokandar_qdrant_c2
+    hostname: q2
+    command: ["./qdrant", "--bootstrap", "http://q1:6335", "--uri", "http://q2:6335"]
+    depends_on: [q1]
+    ports:
+      - "${Q_HTTP2:-6343}:6333"
+    volumes:
+      - type: bind
+        source: ${DATA_ROOT:-/data}/qdrant_cluster/n2
+        target: /qdrant/storage
+  q3:
+    <<: *q
+    container_name: dokandar_qdrant_c3
+    hostname: q3
+    command: ["./qdrant", "--bootstrap", "http://q1:6335", "--uri", "http://q3:6335"]
+    depends_on: [q1]
+    ports:
+      - "${Q_HTTP3:-6353}:6333"
+    volumes:
+      - type: bind
+        source: ${DATA_ROOT:-/data}/qdrant_cluster/n3
+        target: /qdrant/storage

@@ -1,0 +1,19 @@
+.git
+app
+bin
+obj
+**/bin
+**/obj
+# secrets — never into the build context (config is injected at runtime via --env-file)
+env/.env.*
+!env/*.example*
+env/env.txt
+env/components-creds.txt
+*.pem
+*_key
+*_key.pub
+# tenant snapshots are bind-mounted at runtime, not baked
+data/local/result.json
+data/cloud/result.json
+smoke_test/out/
+*.md

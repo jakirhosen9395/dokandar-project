@@ -1,0 +1,7 @@
+DROP TABLE IF EXISTS outbox;
+DROP TABLE IF EXISTS addresses;
+DROP TABLE IF EXISTS profiles;
+DROP TABLE IF EXISTS bd_unions;
+DROP TABLE IF EXISTS bd_upazilas;
+DROP TABLE IF EXISTS bd_districts;
+DROP TABLE IF EXISTS bd_divisions;

@@ -1,0 +1,47 @@
+# DOKANDAR utility — OpenBao 2.x · Docker Compose HA cluster (3-node integrated Raft).
+# bao-1/2/3 form a single Raft quorum (storage "raft" + retry_join); node 1 is initialised, nodes 2+3
+# auto-join and are unsealed with the SAME key. Clients use node 1's published API (8200); writes go to
+# the leader. Per-node Raft data are HOST bind mounts (survive `down -v`). Runs as root (entrypoint
+# bypass) so the bind-mounted data dir is writable.
+name: dokandar_openbao_cluster
+
+x-bao: &bao
+  image: openbao/openbao:${BAO_VERSION:-2.5.4}
+  restart: always
+  user: "0:0"
+  cap_add: [IPC_LOCK]
+  entrypoint: ["bao"]
+  networks: [dokandar_openbao_cluster_net]
+
+services:
+  bao-1:
+    <<: *bao
+    container_name: dokandar_bao_1
+    hostname: bao-1
+    command: ["server", "-config=/openbao/config/bao-1.hcl"]
+    ports: ["${BAO_PORT1:-8200}:8200"]
+    volumes:
+      - { type: bind, source: ./bao-1.hcl, target: /openbao/config/bao-1.hcl, read_only: true }
+      - { type: bind, source: "${DATA_ROOT:-/data}/openbao_cluster/n1", target: /openbao/data, bind: { create_host_path: true } }
+  bao-2:
+    <<: *bao
+    container_name: dokandar_bao_2
+    hostname: bao-2
+    command: ["server", "-config=/openbao/config/bao-2.hcl"]
+    ports: ["${BAO_PORT2:-8202}:8200"]
+    volumes:
+      - { type: bind, source: ./bao-2.hcl, target: /openbao/config/bao-2.hcl, read_only: true }
+      - { type: bind, source: "${DATA_ROOT:-/data}/openbao_cluster/n2", target: /openbao/data, bind: { create_host_path: true } }
+  bao-3:
+    <<: *bao
+    container_name: dokandar_bao_3
+    hostname: bao-3
+    command: ["server", "-config=/openbao/config/bao-3.hcl"]
+    ports: ["${BAO_PORT3:-8203}:8200"]
+    volumes:
+      - { type: bind, source: ./bao-3.hcl, target: /openbao/config/bao-3.hcl, read_only: true }
+      - { type: bind, source: "${DATA_ROOT:-/data}/openbao_cluster/n3", target: /openbao/data, bind: { create_host_path: true } }
+
+networks:
+  dokandar_openbao_cluster_net:
+    name: dokandar_openbao_cluster_net

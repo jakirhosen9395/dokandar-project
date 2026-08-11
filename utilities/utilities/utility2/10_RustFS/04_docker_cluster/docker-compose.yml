@@ -1,0 +1,51 @@
+# RustFS — Docker Compose HA cluster: 4 nodes x 1 drive = one distributed erasure set, S3-compatible.
+# Every node runs the SAME RUSTFS_VOLUMES list (http://rustfs1..4:9000/data); each node serves its local
+# /data and erasure-codes objects across all 4, so the namespace survives one node loss. Per-node data are
+# HOST bind mounts (survive `down -v`). Clients connect to ANY node — one shared S3 namespace.
+x-rustfs: &rustfs
+  image: ${RUSTFS_IMAGE:-rustfs/rustfs:1.0.0-beta.8}
+  restart: always
+  environment: &rfsenv
+    RUSTFS_VOLUMES: "http://rustfs1:9000/data http://rustfs2:9000/data http://rustfs3:9000/data http://rustfs4:9000/data"
+    RUSTFS_ADDRESS: "0.0.0.0:9000"
+    RUSTFS_CONSOLE_ENABLE: "true"
+    RUSTFS_CONSOLE_ADDRESS: "0.0.0.0:9001"
+    RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:?set in .env}
+    RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:?set in .env}
+    RUSTFS_CORS_ALLOWED_ORIGINS: "*"
+    RUSTFS_OBS_LOG_DIRECTORY: "/logs"
+
+services:
+  rustfs1:
+    <<: *rustfs
+    container_name: dokandar_rustfs_c1
+    hostname: rustfs1
+    ports:
+      - "${RFS_API1:-9000}:9000"
+      - "${RFS_CONSOLE1:-9001}:9001"
+    volumes:
+      - ${DATA_ROOT:-/data}/rustfs_cluster/n1/data:/data
+      - ${DATA_ROOT:-/data}/rustfs_cluster/n1/logs:/logs
+  rustfs2:
+    <<: *rustfs
+    container_name: dokandar_rustfs_c2
+    hostname: rustfs2
+    ports:
+      - "${RFS_API2:-9002}:9000"
+    volumes:
+      - ${DATA_ROOT:-/data}/rustfs_cluster/n2/data:/data
+      - ${DATA_ROOT:-/data}/rustfs_cluster/n2/logs:/logs
+  rustfs3:
+    <<: *rustfs
+    container_name: dokandar_rustfs_c3
+    hostname: rustfs3
+    volumes:
+      - ${DATA_ROOT:-/data}/rustfs_cluster/n3/data:/data
+      - ${DATA_ROOT:-/data}/rustfs_cluster/n3/logs:/logs
+  rustfs4:
+    <<: *rustfs
+    container_name: dokandar_rustfs_c4
+    hostname: rustfs4
+    volumes:
+      - ${DATA_ROOT:-/data}/rustfs_cluster/n4/data:/data
+      - ${DATA_ROOT:-/data}/rustfs_cluster/n4/logs:/logs

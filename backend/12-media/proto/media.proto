@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+// 12-media east-west gRPC surface. Package carries the .v1 version segment, so the
+// tonic-generated module path is `dokandar.media.v1` (use tonic::include_proto!("dokandar.media.v1")).
+// Every RPC requires x-internal-token == INTERNAL_SERVICE_TOKEN, compared constant-time (subtle),
+// fail-closed on empty → UNAUTHENTICATED (gRPC code 16).
+package dokandar.media.v1;
+
+service Media {
+  rpc IssueUploadURL (IssueUploadURLRequest) returns (UploadURLResponse);   // mint presigned PUT + pending row
+  rpc MarkUploaded   (MarkUploadedRequest)   returns (MediaInfo);            // confirm PUT → trigger scan/thumbnail
+  rpc GetSignedURL   (GetSignedURLRequest)   returns (SignedURLResponse);    // time-boxed download URL per variant
+  rpc GetMedia       (GetMediaRequest)       returns (MediaInfo);            // metadata + lifecycle state
+}
+
+message IssueUploadURLRequest {
+  string owner_id  = 1;
+  string scope     = 2;
+  string mime      = 3;
+  int64  max_bytes = 4;
+}
+
+message UploadURLResponse {
+  string media_id     = 1;
+  string upload_url   = 2;
+  string method       = 3;   // "PUT"
+  string content_type = 4;
+  int64  max_bytes    = 5;
+  int64  expires_at   = 6;   // unix seconds
+}
+
+message MarkUploadedRequest {
+  string media_id = 1;
+  string sha256   = 2;
+  int64  bytes    = 3;
+}
+
+message GetSignedURLRequest {
+  string media_id       = 1;
+  string variant        = 2;   // original | thumb | medium | large
+  string caller_user_id = 3;   // authorization subject
+}
+
+message SignedURLResponse {
+  string signed_url = 1;
+  int64  expires_at = 2;   // unix seconds
+}
+
+message GetMediaRequest {
+  string media_id = 1;
+}
+
+message MediaInfo {
+  string media_id          = 1;
+  string owner_id          = 2;
+  string scope             = 3;
+  string mime              = 4;
+  int64  bytes             = 5;
+  string state             = 6;   // pending|uploaded|scanned|ready|quarantined|deleted
+  bool   av_clean          = 7;
+  bool   derivatives_ready = 8;
+  string object_key        = 9;
+}

@@ -1,0 +1,26 @@
+.idea/
+.vscode/
+bin/
+*.exe
+*.test
+*.out
+vendor/
+env/.env.*
+!env/.env.*.example
+env/components-creds.txt
+env/env.txt
+!env/env.txt.example
+# smoke_test ships only *.example — the rendered .env carries real creds
+smoke_test/.env
+smoke_test/.env.*
+!smoke_test/.env.example
+smoke_test/out/
+logs/
+data/local/result.json
+data/cloud/result.json
+
+# shared fleet secrets bundle — never commit
+fleet-secrets.txt
+fleet-secrets.public.txt
+env/fleet-secrets.txt
+env/fleet-secrets.public.txt

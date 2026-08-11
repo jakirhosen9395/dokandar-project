@@ -1,0 +1,79 @@
+# NodePort browsing over the VPN: traffic arrives from VPN clients (10.8.0.0/24)
+# or SNAT'd to node IPs (VPC CIDR) — allow both to the service ports.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-vpn-browsing
+  namespace: gateway
+  labels:
+    environment: prod
+    managed-by: gitlab-ci
+    app.kubernetes.io/part-of: dokandar
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - ipBlock: { cidr: 10.0.0.0/16 }
+        - ipBlock: { cidr: 10.8.0.0/24 }
+---
+# NodePort browsing over the VPN: traffic arrives from VPN clients (10.8.0.0/24)
+# or SNAT'd to node IPs (VPC CIDR) — allow both to the service ports.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-vpn-browsing
+  namespace: frontend
+  labels:
+    environment: prod
+    managed-by: gitlab-ci
+    app.kubernetes.io/part-of: dokandar
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - ipBlock: { cidr: 10.0.0.0/16 }
+        - ipBlock: { cidr: 10.8.0.0/24 }
+---
+# NodePort browsing over the VPN: traffic arrives from VPN clients (10.8.0.0/24)
+# or SNAT'd to node IPs (VPC CIDR) — allow both to the service ports.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-vpn-browsing
+  namespace: backend
+  labels:
+    environment: prod
+    managed-by: gitlab-ci
+    app.kubernetes.io/part-of: dokandar
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - ipBlock: { cidr: 10.0.0.0/16 }
+        - ipBlock: { cidr: 10.8.0.0/24 }
+---
+# NodePort browsing over the VPN: traffic arrives from VPN clients (10.8.0.0/24)
+# or SNAT'd to node IPs (VPC CIDR) — allow both to the service ports.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-vpn-browsing
+  namespace: support
+  labels:
+    environment: prod
+    managed-by: gitlab-ci
+    app.kubernetes.io/part-of: dokandar
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - ipBlock: { cidr: 10.0.0.0/16 }
+        - ipBlock: { cidr: 10.8.0.0/24 }

@@ -1,0 +1,42 @@
+# DOKANDAR utility — PostgreSQL 18 · Docker Compose · single-node.
+#
+# DATA SAFETY: the data is a HOST BIND MOUNT (not a named volume), so `docker compose down -v` does
+# NOT delete it — there is deliberately no named volume. `up` re-mounts the same host directory and the
+# data is retained. The ONLY way to delete it is `setup.sh purge` (or removing the host dir by hand).
+name: dokandar-pg-docker-single
+
+services:
+  postgres:
+    image: postgres:${POSTGRES_VERSION:-18}
+    container_name: dokandar_pg_docker_single
+    restart: always
+    env_file: .env
+    environment:
+      # Cluster dir INSIDE the container — from .env. A subdir of the bind-mount target below (avoids
+      # bind-mount ownership issues). Lands on the host at ${DATA_ROOT}/postgresql_docker/pgdata.
+      PGDATA: ${PGDATA:-/var/lib/postgresql/pgdata}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # BIND MOUNT at the image's VOLUME path (/var/lib/postgresql) — survives `docker compose down -v`,
+      # and binding the VOLUME path itself avoids a stray anonymous volume. Long form for clarity;
+      # create_host_path lets Docker create the host dir on first `up`.
+      - type: bind
+        source: ${DATA_ROOT:-/data}/postgresql_docker
+        target: /var/lib/postgresql
+        bind:
+          create_host_path: true
+    networks:
+      - dokandar
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$${POSTGRES_USER:-postgres}\" -d \"$${POSTGRES_DB:-postgres}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    stop_grace_period: 30s
+
+networks:
+  dokandar:
+    name: dokandar_pg_net
+    driver: bridge

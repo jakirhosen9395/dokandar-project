@@ -1,0 +1,92 @@
+# DOKANDAR utility — Elasticsearch 9.4 · Docker Compose HA cluster (3 nodes es01/es02/es03).
+# Security ON. Multi-node REQUIRES transport TLS — a shared CA + node cert (generated once by setup.sh,
+# the keyFile-equivalent) secures inter-node traffic; the HTTP layer stays plain (basic auth) for simple
+# clients. node.name defaults to each container's hostname (es01/es02/es03), matching initial_master_nodes.
+# Per-node data are HOST bind mounts (survive `docker compose down -v`).
+name: dokandar_es_cluster
+
+x-es-node: &es-node
+  image: docker.elastic.co/elasticsearch/elasticsearch:${ES_IMAGE_TAG:-9.4.2}
+  restart: always
+  environment: &es-env
+    - cluster.name=${ES_CLUSTER_NAME:-dokandar}
+    - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:?run setup.sh up - it generates the password + certs}
+    - discovery.seed_hosts=es01,es02,es03
+    - cluster.initial_master_nodes=es01,es02,es03
+    - xpack.security.enabled=true
+    - xpack.security.http.ssl.enabled=false
+    - xpack.security.transport.ssl.enabled=true
+    - xpack.security.transport.ssl.verification_mode=certificate
+    # paths are relative to the ES config dir; ES 9.x entitlements block reading SSL files OUTSIDE config/
+    - xpack.security.transport.ssl.keystore.path=certs/node.p12
+    - xpack.security.transport.ssl.truststore.path=certs/node.p12
+    - ES_JAVA_OPTS=-Xms${ES_JAVA_HEAP:-512m} -Xmx${ES_JAVA_HEAP:-512m}
+    - bootstrap.memory_lock=true
+  ulimits:
+    memlock:
+      soft: -1
+      hard: -1
+    nofile:
+      soft: 65536
+      hard: 65536
+  healthcheck:
+    test: ["CMD-SHELL", "curl -s -u elastic:${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health | grep -qE 'green|yellow'"]
+    interval: 10s
+    timeout: 5s
+    retries: 24
+    start_period: 40s
+  networks: [dokandar_es_cluster_net]
+
+services:
+  es01:
+    <<: *es-node
+    container_name: dokandar_es01
+    hostname: es01                 # => node.name=es01, matching cluster.initial_master_nodes
+    ports:
+      - "${ES_PORT1:-9200}:9200"
+    volumes:
+      - type: bind
+        source: ${CERTS_HOST_PATH:?run setup.sh up first}
+        target: /usr/share/elasticsearch/config/certs
+        read_only: true
+      - type: bind
+        source: ${DATA_ROOT:-/data}/es_cluster/es01
+        target: /usr/share/elasticsearch/data
+        bind:
+          create_host_path: true
+  es02:
+    <<: *es-node
+    container_name: dokandar_es02
+    hostname: es02
+    ports:
+      - "${ES_PORT2:-9201}:9200"
+    volumes:
+      - type: bind
+        source: ${CERTS_HOST_PATH}
+        target: /usr/share/elasticsearch/config/certs
+        read_only: true
+      - type: bind
+        source: ${DATA_ROOT:-/data}/es_cluster/es02
+        target: /usr/share/elasticsearch/data
+        bind:
+          create_host_path: true
+  es03:
+    <<: *es-node
+    container_name: dokandar_es03
+    hostname: es03
+    ports:
+      - "${ES_PORT3:-9202}:9200"
+    volumes:
+      - type: bind
+        source: ${CERTS_HOST_PATH}
+        target: /usr/share/elasticsearch/config/certs
+        read_only: true
+      - type: bind
+        source: ${DATA_ROOT:-/data}/es_cluster/es03
+        target: /usr/share/elasticsearch/data
+        bind:
+          create_host_path: true
+
+networks:
+  dokandar_es_cluster_net:
+    name: dokandar_es_cluster_net

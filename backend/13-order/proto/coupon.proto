@@ -1,0 +1,29 @@
+syntax = "proto3";
+package dokandar.coupon.v1;
+option java_package = "dokandar.coupon.v1";
+option java_multiple_files = true;
+option csharp_namespace = "Dokandar.CouponRpc";
+
+// Coupon.ValidateCoupon @9090 — 13-order is a CLIENT (saga place-time validation,
+// fail-open). Generated Java stubs land in package `dokandar.coupon.v1`
+// (no java_package set on the source proto — kept verbatim from 07-coupon).
+service Coupon {
+  rpc ValidateCoupon(ValidateCouponRequest) returns (ValidateCouponReply);
+}
+
+message ValidateCouponRequest {
+  string code = 1;
+  string user_id = 2;
+  string shop_id = 3;          // optional; empty for platform-scope checks
+  int64  subtotal_minor = 4;
+  string payment_method = 5;   // optional
+}
+
+message ValidateCouponReply {
+  bool   valid = 1;
+  int64  discount_minor = 2;
+  string reason = 3;           // miss reason when !valid
+  string coupon_id = 4;
+  string funded_by = 5;        // shopkeeper | platform
+  bool   stacks_with_sale = 6;
+}

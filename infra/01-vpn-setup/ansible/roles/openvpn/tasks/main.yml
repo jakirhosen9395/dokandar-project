@@ -1,0 +1,131 @@
+---
+# ---------- Packages ----------
+- name: Install OpenVPN and Easy-RSA
+  ansible.builtin.apt:
+    name: [openvpn, easy-rsa]
+    state: present
+    update_cache: true
+
+- name: Ensure server + log directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0750"
+  loop:
+    - "{{ openvpn_server_dir }}"
+    - /var/log/openvpn
+
+# ---------- PKI (Easy-RSA, non-interactive) ----------
+- name: Create Easy-RSA working directory
+  ansible.builtin.command:
+    cmd: "make-cadir {{ openvpn_easyrsa_dir }}"
+    creates: "{{ openvpn_easyrsa_dir }}/easyrsa"
+
+- name: Configure Easy-RSA (ECDSA, long expiry, batch mode)
+  ansible.builtin.copy:
+    dest: "{{ openvpn_easyrsa_dir }}/vars"
+    mode: "0644"
+    content: |
+      set_var EASYRSA_ALGO ec
+      set_var EASYRSA_CURVE prime256v1
+      set_var EASYRSA_CA_EXPIRE 3650
+      set_var EASYRSA_CERT_EXPIRE 3650
+      set_var EASYRSA_BATCH 1
+
+- name: Initialise the PKI
+  ansible.builtin.command:
+    cmd: ./easyrsa init-pki
+    chdir: "{{ openvpn_easyrsa_dir }}"
+    creates: "{{ openvpn_pki_dir }}"
+
+- name: Build the CA (no passphrase)
+  ansible.builtin.command:
+    cmd: ./easyrsa build-ca nopass
+    chdir: "{{ openvpn_easyrsa_dir }}"
+    creates: "{{ openvpn_pki_dir }}/ca.crt"
+  environment:
+    EASYRSA_BATCH: "1"
+    EASYRSA_REQ_CN: "OpenVPN-CA"
+
+- name: Build the server certificate
+  ansible.builtin.command:
+    cmd: ./easyrsa build-server-full server nopass
+    chdir: "{{ openvpn_easyrsa_dir }}"
+    creates: "{{ openvpn_pki_dir }}/issued/server.crt"
+  environment:
+    EASYRSA_BATCH: "1"
+
+- name: Generate the tls-crypt key
+  ansible.builtin.command:
+    cmd: "openvpn --genkey secret {{ openvpn_server_dir }}/tls-crypt.key"
+    creates: "{{ openvpn_server_dir }}/tls-crypt.key"
+
+- name: Copy CA + server cert/key into the server directory
+  ansible.builtin.copy:
+    remote_src: true
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: "0600"
+  loop:
+    - { src: "{{ openvpn_pki_dir }}/ca.crt", dest: "{{ openvpn_server_dir }}/ca.crt" }
+    - { src: "{{ openvpn_pki_dir }}/issued/server.crt", dest: "{{ openvpn_server_dir }}/server.crt" }
+    - { src: "{{ openvpn_pki_dir }}/private/server.key", dest: "{{ openvpn_server_dir }}/server.key" }
+
+# ---------- Server config ----------
+- name: Deploy server.conf
+  ansible.builtin.template:
+    src: server.conf.j2
+    dest: "{{ openvpn_server_dir }}/server.conf"
+    mode: "0644"
+  notify: restart openvpn
+
+# ---------- IP forwarding ----------
+- name: Enable IP forwarding (persistent)
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/99-openvpn.conf
+    mode: "0644"
+    content: "net.ipv4.ip_forward = 1\n"
+  notify: reload sysctl
+
+- name: Apply IP forwarding immediately
+  ansible.builtin.command: sysctl -w net.ipv4.ip_forward=1
+  changed_when: false
+
+# ---------- NAT / firewall ----------
+- name: Preseed iptables-persistent (avoid interactive prompts)
+  ansible.builtin.debconf:
+    name: iptables-persistent
+    question: "{{ item }}"
+    value: "true"
+    vtype: boolean
+  loop:
+    - iptables-persistent/autosave_v4
+    - iptables-persistent/autosave_v6
+
+- name: Install iptables-persistent (for rule persistence)
+  ansible.builtin.apt:
+    name: iptables-persistent
+    state: present
+
+- name: Add NAT MASQUERADE for VPN client traffic
+  ansible.builtin.iptables:
+    table: nat
+    chain: POSTROUTING
+    source: "{{ openvpn_vpn_cidr }}"
+    out_interface: "{{ ansible_default_ipv4.interface }}"
+    jump: MASQUERADE
+  notify: save iptables
+
+# ---------- Service ----------
+- name: Enable and start the OpenVPN service
+  ansible.builtin.systemd:
+    name: "openvpn-server@server"
+    enabled: true
+    state: started
+    daemon_reload: true
+
+# ---------- Default client (admin_user) ----------
+- name: Create the default VPN client ({{ openvpn_client_name }})
+  ansible.builtin.include_tasks: client.yml
+  vars:
+    vpn_user: "{{ openvpn_client_name }}"

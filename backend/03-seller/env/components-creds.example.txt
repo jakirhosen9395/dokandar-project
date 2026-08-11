@@ -1,0 +1,55 @@
+# env/components-creds.example.txt — infra-creds template for 03-seller
+# (### NN_Service format). init-env.sh reads env/components-creds.txt (gitignored).
+# This .example is the committed PLACEHOLDER; real secrets go only in the
+# gitignored copy, never here.
+#
+#   cp env/components-creds.example.txt env/components-creds.txt
+#   nano env/components-creds.txt          # paste real values
+#   chmod 600 env/components-creds.txt
+#   ./env/init-env.sh .env.dev
+#
+# 03-seller reads ONLY these blocks: 01_PostgreSQL 02_MongoDB 04_Redis 05_Kafka
+# 07_Elastic_APM (+ the Auth_Identity block). Other blocks are ignored —
+# including 03_Elasticsearch (:9201), the search/review business ES used ONLY by
+# 05-search + 08-review. Paste your FULL infra dump; init-env.sh reads only what
+# it needs.
+#
+# VERIFY-ONLY: seller never holds the RS256 private key. Paste auth's PUBLIC key
+# + the shared INTERNAL_SERVICE_TOKEN into the ### Auth_Identity block below
+# (from 01-auth's rendered .env.dev: JWT_PUBLIC_KEY_B64 / INTERNAL_SERVICE_TOKEN).
+
+### 01_PostgreSQL
+   endpoint       postgresql://<user>:<password>@<host>:5432/postgres
+   host:port      <host>:5432
+   user           <user>
+   password       <password>
+
+### 02_MongoDB
+   endpoint       mongodb://<user>:<password>@<host>:27017/?authSource=admin
+   host:port      <host>:27017
+   user           <user>
+   password       <password>
+
+### 04_Redis
+   endpoint       redis://default:<password>@<host>:6379/0
+   host:port      <host>:6379
+   user           default
+   password       <password>
+
+### 05_Kafka
+   bootstrap      <host>:9092
+   ui             http://<host>:8080
+   auth           none (PLAINTEXT)
+
+# --- 07's `elasticsearch` line (:9200) IS the application log sink for seller. ---
+### 07_Elastic_APM
+   elasticsearch  http://elastic:<apm-es-password>@<host>:9200
+   apm-ingest     http://<host>:8200  (Bearer token)
+   apm-token      <apm-bearer-token>
+   kibana-ui      http://<host>:5601  (login: elastic)
+   elastic-pass   <apm-es-password>
+
+# --- Auth_Identity: paste from 01-auth's rendered .env.dev (NOT generated here). ---
+### Auth_Identity
+   auth_service_public_key   <paste 01-auth .env.dev JWT_PUBLIC_KEY_B64>
+   internal_service_token    <paste 01-auth .env.dev INTERNAL_SERVICE_TOKEN>

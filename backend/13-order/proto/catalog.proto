@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package dokandar.catalog.v1;
+
+option java_package = "com.dokandar.catalog.grpc.proto";
+option java_multiple_files = true;
+option java_outer_classname = "CatalogProto";
+
+// Catalog — east-west product + stock API. 13-order is a CLIENT of this proto:
+// the checkout saga calls ReserveStock (forward) and ReleaseStock (compensation).
+// Every RPC requires `x-internal-token` metadata equal to the service's
+// INTERNAL_SERVICE_TOKEN; mismatch -> UNAUTHENTICATED.
+service Catalog {
+    rpc GetProduct   (GetProductRequest)   returns (Product);
+    rpc CheckStock   (CheckStockRequest)   returns (StockAnswer);
+    rpc ReserveStock (ReserveStockRequest) returns (ReserveStockAnswer);
+    rpc ReleaseStock (ReleaseStockRequest) returns (ReleaseStockAnswer);
+}
+
+message GetProductRequest { string product_id = 1; }
+
+message Product {
+    string id             = 1;
+    string name_bn        = 2;
+    string name_en        = 3;
+    string description_bn = 4;
+    string description_en = 5;
+    string sharing_model  = 6;
+    int32  list_price_minor = 7;
+    int32  sale_price_minor = 8;
+    bool   backorderable  = 9;
+    repeated Variant variants = 10;
+}
+
+message Variant {
+    string id               = 1;
+    string name_bn          = 2;
+    string name_en          = 3;
+    map<string,string> attributes = 4;
+    int32  list_price_minor = 5;
+    int32  sale_price_minor = 6;
+}
+
+message CheckStockRequest {
+    string variant_id = 1;
+    string shop_id    = 2;   // "" for shared
+    int32  quantity   = 3;
+}
+message StockAnswer {
+    bool  sufficient    = 1;
+    bool  backorderable = 2;
+    int32 available     = 3;
+}
+
+message ReserveStockRequest {
+    string idempotency_key = 1;   // REQUIRED
+    string order_id        = 2;
+    string variant_id      = 3;
+    string shop_id         = 4;   // "" for shared
+    int32  quantity        = 5;
+}
+message ReserveStockAnswer {
+    bool   ok             = 1;
+    string error_code     = 2;    // 'insufficient_stock' when ok=false
+    string reservation_id = 3;
+    bool   backordered    = 4;
+}
+
+message ReleaseStockRequest { string reservation_id = 1; }
+message ReleaseStockAnswer  { bool ok = 1; }

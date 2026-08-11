@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: support-allow-alb
+  namespace: support
+  labels:
+    environment: prod
+    managed-by: gitlab-ci
+    app.kubernetes.io/part-of: dokandar
+spec:
+  podSelector:
+    matchLabels:
+      app: dokandar-support
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 10.0.0.0/16        # TODO: VPC CIDR (dev-only surface; tighten further)
+      ports:
+        - protocol: TCP
+          port: 8000

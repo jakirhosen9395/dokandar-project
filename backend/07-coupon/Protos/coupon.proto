@@ -1,0 +1,25 @@
+syntax = "proto3";
+package dokandar.coupon.v1;
+option csharp_namespace = "Dokandar.CouponRpc";
+
+// Coupon.ValidateCoupon @9090 — called east-west by 06-cart (quote build) and 13-order (place time).
+service Coupon {
+  rpc ValidateCoupon(ValidateCouponRequest) returns (ValidateCouponReply);
+}
+
+message ValidateCouponRequest {
+  string code = 1;
+  string user_id = 2;
+  string shop_id = 3;          // optional; empty for platform-scope checks
+  int64  subtotal_minor = 4;
+  string payment_method = 5;   // optional
+}
+
+message ValidateCouponReply {
+  bool   valid = 1;
+  int64  discount_minor = 2;
+  string reason = 3;           // miss reason when !valid
+  string coupon_id = 4;
+  string funded_by = 5;        // shopkeeper | platform
+  bool   stacks_with_sale = 6;
+}

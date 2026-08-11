@@ -1,0 +1,56 @@
+# env/components-creds.example.txt — infra-creds template for 14-notification (### NN_Service format).
+#
+# REAL secrets go in env/components-creds.txt (GITIGNORED) — never in this committed
+# .example file. Workflow:
+#   cp env/components-creds.example.txt env/components-creds.txt
+#   $EDITOR env/components-creds.txt        # paste your REAL infra creds (the full ### dump)
+#   chmod 600 env/components-creds.txt
+#   # paste auth's JWT_PUBLIC_KEY_B64 + INTERNAL_SERVICE_TOKEN into ### Auth_Identity below
+#   ./env/init-env.sh .env.dev              # renders env/.env.dev
+#
+# init-env.sh reads env/components-creds.txt (gitignored). Paste your FULL infra status
+# dump (all ### blocks); 14-notification uses only these:
+#   02_MongoDB 04_Redis 05_Kafka 06_RabbitMQ 07_Elastic_APM 15_NATS.
+# The application LOG SINK Elasticsearch is the APM-stack ES (block 07, :9200 — the
+# `elasticsearch` line + `elastic-pass`); block 03_Elasticsearch (:9201) is NOT read
+# (that ES is the search/review business store, used only by 05-search + 08-review).
+#
+# 14-notification is VERIFY-ONLY: it does NOT mint JWTs. Paste auth's PUBLIC key + the
+# shared INTERNAL_SERVICE_TOKEN (from 01-auth's rendered .env.dev) into the
+# ### Auth_Identity block below.
+
+### 02_MongoDB
+   endpoint       mongodb://<user>:<password>@<host>:27017/?authSource=admin
+   host:port      <host>:27017
+   user           <user>
+   password       <password>
+
+### 04_Redis
+   endpoint       redis://default:<password>@<host>:6379/0
+   host:port      <host>:6379
+   user           default
+   password       <password>
+
+### 05_Kafka
+   bootstrap      <host>:9092
+
+### 06_RabbitMQ
+   amqp-url       amqp://<user>:<password>@<host>:5672/
+   host:port      <host>:5672
+   user           <user>
+   password       <password>
+
+### 07_Elastic_APM
+   elasticsearch  http://elastic:<elastic-pass>@<host>:9200
+   apm-ingest     http://<host>:8200  (Bearer token)
+   apm-token      <apm-bearer-token>
+   elastic-pass   <elastic-pass>
+
+### 15_NATS
+   client-url     nats://<auth-token>@<host>:4222
+   host:port      <host>:4222
+   auth-token     <auth-token>
+
+### Auth_Identity        # 14-notification is verify-only — paste from 01-auth's rendered .env.dev
+   auth_service_public_key   <paste 01-auth .env.dev JWT_PUBLIC_KEY_B64>
+   internal_service_token    <paste 01-auth .env.dev INTERNAL_SERVICE_TOKEN>

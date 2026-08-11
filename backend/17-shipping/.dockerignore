@@ -1,0 +1,42 @@
+# See https://docs.docker.com/engine/reference/builder/#dockerignore-file for more about ignoring files.
+
+# Ignore git / CI / Docker metadata.
+.git/
+.github/
+.gitignore
+.dockerignore
+Dockerfile*
+
+# Ignore bundler config + locally vendored gems.
+.bundle/
+vendor/bundle/
+
+# secrets — never into the build context (config is injected at runtime via --env-file)
+.env*
+env/.env.*
+!env/*.example*
+env/env.txt
+env/components-creds.txt
+config/master.key
+config/credentials/*.key
+*.pem
+*_key
+*_key.pub
+
+# tenant snapshots are bind-mounted at runtime, not baked
+data/local/result.json
+data/cloud/result.json
+smoke_test/out/
+
+# Ignore all logfiles and tempfiles.
+log/*
+!log/.keep
+tmp/*
+!tmp/.keep
+tmp/pids/*
+!tmp/pids/.keep
+
+# Ignore Kamal / devcontainer files.
+config/deploy*.yml
+.kamal/
+.devcontainer/

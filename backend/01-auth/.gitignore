@@ -1,0 +1,24 @@
+.venv/
+__pycache__/
+*.pyc
+env/.env.*
+!env/.env.*.example
+env/components-creds.txt
+*.pem
+*_key
+*_key.pub
+logs/
+data/local/result.json
+data/cloud/result.json
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# shared fleet secrets bundle — never commit
+fleet-secrets.txt
+fleet-secrets.public.txt
+env/fleet-secrets.txt
+env/fleet-secrets.public.txt
+env/env.txt

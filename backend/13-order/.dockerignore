@@ -1,0 +1,17 @@
+target/
+.git/
+.gitignore
+env/.env.*
+!env/*.example*
+env/components-creds.txt
+env/env.txt
+*.pem
+*_key
+*_key.pub
+data/*/result.json
+smoke_test/out/
+app/
+**/*.pyc
+__pycache__/
+README.md
+architecture.md

@@ -1,0 +1,110 @@
+---
+# FULL platform rollout — one command, PARALLEL:
+#   Play 1 (localhost): read the GitLab PAT, create a group runner (token).
+#   Play 2 (utilities + runner, strategy: free): the utilities host installs the
+#     data tier WHILE the runner host installs/registers the GitLab runner —
+#     neither waits for the other, so no server sits idle. The moment the
+#     runner is registered, the runner host (delegating to localhost) triggers
+#     every service pipeline; utilities may still be installing — that's fine,
+#     pipelines only need the runner (build -> push ECR -> update manifests).
+#
+# Prereqs: 01-vpn-setup applied + VPN connected (utilities has a private IP);
+#          PAT in <repo-root>/.gitlab_token.
+# Run:     ansible-playbook -i inventory.ini deploy.yml
+
+- name: Prepare token + create a group runner (control node)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir }}/../../.."
+    group_id: 134171164
+  tasks:
+    - name: Read the GitLab PAT from the repo root
+      ansible.builtin.set_fact:
+        gitlab_token: "{{ lookup('file', repo_root ~ '/.gitlab_token') | trim }}"
+      no_log: true
+
+    - name: Fail early if the token file is empty
+      ansible.builtin.assert:
+        that: gitlab_token | length > 20
+        fail_msg: "Put your GitLab PAT in {{ repo_root }}/.gitlab_token"
+
+    - name: Create a group runner (tag dokandar-runner)
+      ansible.builtin.uri:
+        url: "https://gitlab.com/api/v4/user/runners"
+        method: POST
+        headers: { PRIVATE-TOKEN: "{{ gitlab_token }}" }
+        body_format: form-urlencoded
+        body:
+          runner_type: group_type
+          group_id: "{{ group_id }}"
+          tag_list: dokandar-runner
+          run_untagged: "false"
+          description: "dokandar-runner (ansible)"
+        status_code: 201
+      register: runner_create
+      no_log: true
+
+    - name: Stash facts for the parallel play
+      ansible.builtin.set_fact:
+        runner_token: "{{ runner_create.json.token }}"
+        utilities_repo: "https://oauth2:{{ gitlab_token }}@gitlab.com/learningdevopstools/utilities/utilities.git"
+      no_log: true
+
+- name: Utilities + runner IN PARALLEL (strategy free — no idle servers)
+  hosts: utilities:runner
+  strategy: free
+  gather_facts: true
+  vars:
+    gitlab_token: "{{ hostvars['localhost']['gitlab_token'] }}"
+    runner_token: "{{ hostvars['localhost']['runner_token'] }}"
+    utilities_repo: "{{ hostvars['localhost']['utilities_repo'] }}"
+    group_id: 134171164
+  tasks:
+    # ---- utilities host path ----
+    - name: Utilities host — Docker + the 16-tool data tier
+      ansible.builtin.include_role:
+        name: data-tier
+      when: "'utilities' in group_names"
+
+    # ---- runner host path (runs concurrently with the above) ----
+    - name: Runner host — install + register the GitLab runner
+      ansible.builtin.include_role:
+        name: gitlab-runner
+      when: "'runner' in group_names"
+
+    - name: List all group projects (from the control node, right after the runner is up)
+      ansible.builtin.uri:
+        url: "https://gitlab.com/api/v4/groups/{{ group_id }}/projects?include_subgroups=true&per_page=100&simple=true"
+        headers: { PRIVATE-TOKEN: "{{ gitlab_token }}" }
+      register: projects
+      delegate_to: localhost
+      become: false
+      when: "'runner' in group_names"
+      no_log: true
+
+    - name: Trigger a pipeline for each backend + frontend repo
+      ansible.builtin.uri:
+        url: "https://gitlab.com/api/v4/projects/{{ item.id }}/pipeline"
+        method: POST
+        headers: { PRIVATE-TOKEN: "{{ gitlab_token }}" }
+        body_format: form-urlencoded
+        body: { ref: "source-code" }   # the code branch (default_branch is a placeholder README)
+        status_code: [201, 400]
+      loop: "{{ projects.json | selectattr('path_with_namespace', 'search', '/backend/[0-9]|ui/frontend$') | rejectattr('path_with_namespace', 'search', 'deletion_scheduled') | list }}"
+      loop_control: { label: "{{ item.path_with_namespace }}" }
+      delegate_to: localhost
+      become: false
+      when: "'runner' in group_names"
+      no_log: true
+
+    - name: Pipelines triggered
+      ansible.builtin.debug:
+        msg: "Runner registered and {{ projects.json | selectattr('path_with_namespace','search','/backend/[0-9]|ui/frontend$') | rejectattr('path_with_namespace','search','deletion_scheduled') | list | length }} pipelines triggered — building while utilities finishes in parallel."
+      when: "'runner' in group_names"
+
+# Play 3 (localhost): let the build wave run on the big runner for 20 min, then
+# shrink it to the steady size (m7i-flex.large). Kept in its own playbook so it
+# can also be run standalone; imported here so `deploy.yml` is the whole lifecycle.
+- import_playbook: downsize-runner.yml

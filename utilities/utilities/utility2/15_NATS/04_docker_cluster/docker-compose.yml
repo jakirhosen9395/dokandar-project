@@ -1,0 +1,39 @@
+# NATS JetStream — Docker Compose HA cluster: 3 SYMMETRIC nodes meshed by static routes, JetStream on every
+# node. R3 (replicas=3) streams/KV are RAFT-replicated across all three, so the cluster tolerates one node
+# loss. No primary — JetStream elects a meta-group leader (and per-stream leader) via RAFT. Per-node store =
+# HOST bind mounts (survive `down -v`). Client 4222 / monitor 8222 / route mesh 6222.
+x-nats: &nats
+  image: ${NATS_IMAGE:-nats:2.14}
+  restart: always
+
+services:
+  nats1:
+    <<: *nats
+    container_name: dokandar_nats_c1
+    hostname: nats1
+    command: ["-js","-sd","/data","-m","8222","--auth","${NATS_AUTH_TOKEN:?set in .env}","--name","nats1","--cluster_name","${NATS_CLUSTER_NAME:-dokandar}","--cluster","nats://0.0.0.0:6222","--routes","nats://nats1:6222,nats://nats2:6222,nats://nats3:6222"]
+    ports:
+      - "${N_CLIENT1:-4222}:4222"
+      - "${N_MON1:-8222}:8222"
+    volumes:
+      - ${DATA_ROOT:-/data}/nats_cluster/n1:/data
+  nats2:
+    <<: *nats
+    container_name: dokandar_nats_c2
+    hostname: nats2
+    command: ["-js","-sd","/data","-m","8222","--auth","${NATS_AUTH_TOKEN:?set in .env}","--name","nats2","--cluster_name","${NATS_CLUSTER_NAME:-dokandar}","--cluster","nats://0.0.0.0:6222","--routes","nats://nats1:6222,nats://nats2:6222,nats://nats3:6222"]
+    ports:
+      - "${N_CLIENT2:-4223}:4222"
+      - "${N_MON2:-8223}:8222"
+    volumes:
+      - ${DATA_ROOT:-/data}/nats_cluster/n2:/data
+  nats3:
+    <<: *nats
+    container_name: dokandar_nats_c3
+    hostname: nats3
+    command: ["-js","-sd","/data","-m","8222","--auth","${NATS_AUTH_TOKEN:?set in .env}","--name","nats3","--cluster_name","${NATS_CLUSTER_NAME:-dokandar}","--cluster","nats://0.0.0.0:6222","--routes","nats://nats1:6222,nats://nats2:6222,nats://nats3:6222"]
+    ports:
+      - "${N_CLIENT3:-4224}:4222"
+      - "${N_MON3:-8224}:8222"
+    volumes:
+      - ${DATA_ROOT:-/data}/nats_cluster/n3:/data

@@ -1,0 +1,31 @@
+{
+  "name": "dokandar-notification",
+  "version": "0.1.0",
+  "description": "DOKANDAR 14-notification — Node 24 / Fastify 5 (MongoDB inbox + Redis + Kafka + RabbitMQ + NATS)",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start:prod": "node dist/server.js"
+  },
+  "dependencies": {
+    "@fastify/swagger": "^9.4.0",
+    "@fastify/swagger-ui": "^5.2.0",
+    "@fastify/websocket": "^11.0.0",
+    "amqplib": "^0.10.4",
+    "axios": "^1.7.0",
+    "elastic-apm-node": "^4.9.0",
+    "fastify": "^5.2.0",
+    "ioredis": "^5.4.0",
+    "jsonwebtoken": "^9.0.2",
+    "kafkajs": "^2.2.4",
+    "mongodb": "^6.10.0",
+    "nats": "^2.28.0",
+    "prom-client": "^15.1.0"
+  },
+  "devDependencies": {
+    "@types/amqplib": "^0.10.5",
+    "@types/jsonwebtoken": "^9.0.0",
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.0",
+    "typescript": "^5.6.0"
+  }
+}

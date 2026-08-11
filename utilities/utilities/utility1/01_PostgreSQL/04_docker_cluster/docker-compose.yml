@@ -1,0 +1,109 @@
+# DOKANDAR utility — PostgreSQL 18 · Docker Compose · HA cluster (streaming replication).
+#
+# Topology: 1 PRIMARY (read-write) + 2 hot-standby REPLICAS (read-only), physical streaming
+# replication with one replication slot per replica — the same HA shape as the native cluster_mode
+# run_book. Failover is manual (pg_promote); see README.
+#
+# DATA SAFETY: each node's data is a HOST BIND MOUNT (no named volume), mounted at the image's
+# /var/lib/postgresql VOLUME path, so `docker compose down -v` does NOT delete it and all three nodes
+# resync on `up`. The only way to wipe is `setup.sh purge`.
+name: dokandar-pg-docker-cluster
+
+x-pg-health: &pg-health
+  test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$${POSTGRES_USER:-postgres}\" -d \"$${POSTGRES_DB:-postgres}\""]
+  interval: 10s
+  timeout: 5s
+  retries: 6
+  start_period: 30s
+
+services:
+  pg-primary:
+    image: postgres:${POSTGRES_VERSION:-18}
+    container_name: dokandar_pg_primary
+    hostname: pg-primary
+    restart: always
+    env_file: .env
+    environment:
+      PGDATA: ${PGDATA:-/var/lib/postgresql/pgdata}
+    # Replication GUCs on the primary (replicas ride PG 18 defaults, which already support streaming).
+    command:
+      - postgres
+      - -c
+      - wal_level=replica
+      - -c
+      - max_wal_senders=10
+      - -c
+      - max_replication_slots=10
+      - -c
+      - hot_standby=on
+      - -c
+      - hot_standby_feedback=on
+      - -c
+      - wal_keep_size=512MB
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"      # primary RW host port — test.sh connects here
+    volumes:
+      - type: bind
+        source: ${DATA_ROOT:-/data}/postgresql_cluster/primary
+        target: /var/lib/postgresql
+        bind: { create_host_path: true }
+      - ./primary/initdb.d:/docker-entrypoint-initdb.d:ro   # creates repl role + slots + pg_hba line
+    networks: [dokandar]
+    healthcheck: *pg-health
+
+  pg-replica1:
+    image: postgres:${POSTGRES_VERSION:-18}
+    container_name: dokandar_pg_replica1
+    hostname: pg-replica1
+    restart: always
+    env_file: .env
+    environment:
+      PGDATA: ${PGDATA:-/var/lib/postgresql/pgdata}
+      PRIMARY_HOST: pg-primary
+      REPL_SLOT: replica1_slot
+    entrypoint: ["bash", "/usr/local/bin/replica-entrypoint.sh"]
+    depends_on:
+      pg-primary: { condition: service_healthy }
+    ports:
+      - "${PG_REPLICA1_PORT:-5433}:5432"   # replica 1 RO
+    volumes:
+      - type: bind
+        source: ${DATA_ROOT:-/data}/postgresql_cluster/replica1
+        target: /var/lib/postgresql
+        bind: { create_host_path: true }
+      - ./replica/entrypoint.sh:/usr/local/bin/replica-entrypoint.sh:ro
+    networks: [dokandar]
+    healthcheck:
+      <<: *pg-health
+      start_period: 90s                    # first start does wait-for-primary + pg_basebackup
+
+  pg-replica2:
+    image: postgres:${POSTGRES_VERSION:-18}
+    container_name: dokandar_pg_replica2
+    hostname: pg-replica2
+    restart: always
+    env_file: .env
+    environment:
+      PGDATA: ${PGDATA:-/var/lib/postgresql/pgdata}
+      PRIMARY_HOST: pg-primary
+      REPL_SLOT: replica2_slot
+    entrypoint: ["bash", "/usr/local/bin/replica-entrypoint.sh"]
+    depends_on:
+      pg-primary: { condition: service_healthy }
+    ports:
+      - "${PG_REPLICA2_PORT:-5434}:5432"   # replica 2 RO
+    volumes:
+      - type: bind
+        source: ${DATA_ROOT:-/data}/postgresql_cluster/replica2
+        target: /var/lib/postgresql
+        bind: { create_host_path: true }
+      - ./replica/entrypoint.sh:/usr/local/bin/replica-entrypoint.sh:ro
+    networks: [dokandar]
+    healthcheck:
+      <<: *pg-health
+      start_period: 90s
+
+networks:
+  dokandar:
+    name: dokandar_pg_cluster_net
+    driver: bridge

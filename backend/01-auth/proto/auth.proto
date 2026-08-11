@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package dokandar.auth.v1;
+
+// Auth — east-west identity queries used by Order/Shop/Notification/etc.
+// Caller must set `x-internal-token` metadata = INTERNAL_SERVICE_TOKEN
+// configured on this auth service. Mismatch → UNAUTHENTICATED.
+service Auth {
+    rpc LookupShopkeeper(LookupShopkeeperRequest) returns (LookupShopkeeperResponse);
+    rpc GetUserKyc      (GetUserKycRequest)        returns (GetUserKycResponse);
+}
+
+message LookupShopkeeperRequest {
+    string user_id = 1;
+}
+
+message LookupShopkeeperResponse {
+    bool   exists   = 1;
+    string role     = 2;   // admin|shopkeeper|shop_staff|platform_staff|customer
+    string status   = 3;   // active|suspended|pending
+    // For shop_staff: their shopkeeper user_id (populated once Shop denormalises
+    // ownership). Empty string while not applicable.
+    string owner_id = 4;
+}
+
+message GetUserKycRequest {
+    string user_id = 1;
+}
+
+message GetUserKycResponse {
+    string tier            = 1;  // kyc enum value: unverified|submitted|verified|rejected
+    string last_updated_at = 2;  // ISO-8601
+}

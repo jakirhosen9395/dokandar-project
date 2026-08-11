@@ -1,0 +1,40 @@
+---
+# Give the build wave time to run, then shrink the runner from the build size
+# (c5.2xlarge) to the steady size (m7i-flex.large). This runs automatically at
+# the end of deploy.yml; you can also run it on its own:
+#   ansible-playbook downsize-runner.yml
+#   ansible-playbook downsize-runner.yml -e runner_steady_type=t3.small
+#   ansible-playbook downsize-runner.yml -e downsize_wait_minutes=30
+- name: Downsize the runner after the build wave
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir }}/../../.."
+    group_id: 134171164
+    runner_steady_type: "m7i-flex.large"
+    utilities_type: "m7i-flex.large"
+    downsize_wait_minutes: 20
+  tasks:
+    - name: Let the pipelines build on the big runner before shrinking
+      ansible.builtin.pause:
+        minutes: "{{ downsize_wait_minutes | int }}"
+
+    - name: Shrink the runner (in-place stop/resize/start — runner config survives)
+      # argv form so Ansible passes the -var value to terraform verbatim; a
+      # plain string would be shlex-split and lose the quotes around the
+      # instance types, making terraform read "m7i-flex.large" as an HCL
+      # variable reference ("Variables not allowed").
+      ansible.builtin.command:
+        argv:
+          - terraform
+          - apply
+          - -auto-approve
+          - -input=false
+          - -var
+          - 'instance_types={gitlab_runner="{{ runner_steady_type }}",utilities="{{ utilities_type }}"}'
+        chdir: "{{ playbook_dir }}/../terraform"
+      changed_when: true
+
+    - ansible.builtin.debug:
+        msg: "Runner downsized to {{ runner_steady_type }}. Scale back up anytime with: terraform apply (defaults restore c5.2xlarge)"

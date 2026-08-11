@@ -1,0 +1,23 @@
+# ALB targets pods directly (target-type: ip); allow node/ALB traffic to the gateway.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gateway-allow-alb
+  namespace: gateway
+  labels:
+    environment: prod
+    managed-by: gitlab-ci
+    app.kubernetes.io/part-of: dokandar
+spec:
+  podSelector:
+    matchLabels:
+      app: dokandar-api-gateway
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 10.0.0.0/16        # TODO: VPC CIDR (ALB + node ENIs)
+      ports:
+        - protocol: TCP
+          port: 8000

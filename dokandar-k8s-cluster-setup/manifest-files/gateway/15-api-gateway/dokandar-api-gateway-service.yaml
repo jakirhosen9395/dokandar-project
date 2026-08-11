@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: dokandar-api-gateway
+  namespace: gateway
+  labels:
+    app: dokandar-api-gateway
+    component: gateway
+    environment: prod
+    managed-by: gitlab-ci
+    app.kubernetes.io/part-of: dokandar
+  annotations:
+    alb.ingress.kubernetes.io/healthcheck-path: "/ready"
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthcheck-healthy-threshold: "3"
+    alb.ingress.kubernetes.io/healthcheck-unhealthy-threshold: "2"
+spec:
+  # NodePort: browsable over the VPN at http://<node-private-ip>:30015
+  # (mirrors the old host convention 100NN -> 30000+NN)
+  type: NodePort
+  selector:
+    app: dokandar-api-gateway
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8000
+      targetPort: 8080
+      nodePort: 30015
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dokandar-api-gateway
+  namespace: gateway
+  labels:
+    app: dokandar-api-gateway
+    component: gateway
+    environment: prod
+    managed-by: gitlab-ci
+    app.kubernetes.io/part-of: dokandar
+  annotations:
+    # AWS Load Balancer Controller (same ALB annotation family as the reference repo)
+    alb.ingress.kubernetes.io/scheme: internal   # private-only: reachable over the VPN
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.name: dokandar-prod          # one shared ALB
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    # TODO (HTTPS): add an ACM cert, then:
+    #   listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]' + ssl-redirect: "443" + certificate-arn: <arn>
+    alb.ingress.kubernetes.io/healthcheck-path: "/ready"
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthcheck-healthy-threshold: "3"
+    alb.ingress.kubernetes.io/healthcheck-unhealthy-threshold: "2"
+spec:
+  ingressClassName: alb
+  rules:
+    - host: api.dokandar.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: dokandar-api-gateway
+                port:
+                  number: 8080

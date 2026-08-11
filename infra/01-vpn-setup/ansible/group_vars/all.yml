@@ -1,0 +1,4 @@
+---
+# Variables that apply to all hosts. Connection details (SSM bucket/region) and
+# openvpn_public_ip come from the Terraform-generated inventory.ini.
+openvpn_client_name: "admin_user"

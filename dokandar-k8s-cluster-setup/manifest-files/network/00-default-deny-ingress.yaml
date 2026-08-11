@@ -1,0 +1,55 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: gateway
+  labels:
+    environment: prod
+    managed-by: gitlab-ci
+    app.kubernetes.io/part-of: dokandar
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: frontend
+  labels:
+    environment: prod
+    managed-by: gitlab-ci
+    app.kubernetes.io/part-of: dokandar
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: backend
+  labels:
+    environment: prod
+    managed-by: gitlab-ci
+    app.kubernetes.io/part-of: dokandar
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: support
+  labels:
+    environment: prod
+    managed-by: gitlab-ci
+    app.kubernetes.io/part-of: dokandar
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress

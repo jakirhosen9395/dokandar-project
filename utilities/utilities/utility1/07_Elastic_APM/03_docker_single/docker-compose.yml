@@ -1,0 +1,90 @@
+# DOKANDAR utility — Elastic APM stack · Docker Compose single-node · INTEGRATED 3-service stack.
+# Ported from github.com/jakirhosen9395/elastic-apm, pinned to ${ELASTIC_VERSION:-9.4.2} (DOKANDAR §8).
+#   elasticsearch : data store (security ON — plain HTTP + basic auth)        ${ES_HTTP_PORT:-9200}, 9300
+#   kibana        : the APM app UI (logs in as kibana_system)                 ${KIBANA_PORT:-5601}
+#   apm-server    : agent intake; config in the bind-mounted ./apm-server.yml ${APM_PORT:-8200}
+# Data is a HOST bind mount (survives `down -v`). Driven by setup.sh (staged: ES → set kibana_system
+# password via the ES API → Kibana + apm-server).
+name: dokandar_apm_single
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION:-9.4.2}
+    container_name: dokandar_apm_es
+    hostname: elasticsearch
+    restart: always
+    environment:
+      - node.name=apm-es-01
+      - cluster.name=dokandar-apm
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - ES_JAVA_OPTS=-Xms${ES_JAVA_HEAP:-1g} -Xmx${ES_JAVA_HEAP:-1g}
+      - xpack.security.enabled=true
+      - xpack.security.enrollment.enabled=true
+      - xpack.security.authc.api_key.enabled=true
+      # explicit TLS-off → plain HTTP + basic auth (ES 9.x would otherwise auto-enable HTTP TLS).
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:?run setup.sh up}
+    ulimits:
+      memlock: { soft: -1, hard: -1 }
+      nofile:  { soft: 65536, hard: 65536 }
+    ports:
+      - "${ES_HTTP_PORT:-9200}:9200"
+    volumes:
+      - { type: bind, source: "${DATA_ROOT:-/data}/apm_stack/es", target: /usr/share/elasticsearch/data, bind: { create_host_path: true } }
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -u elastic:${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health | grep -qE 'green|yellow'"]
+      interval: 10s
+      timeout: 5s
+      retries: 24
+      start_period: 30s
+    networks: [dokandar_apm_net]
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:${ELASTIC_VERSION:-9.4.2}
+    container_name: dokandar_apm_kibana
+    hostname: kibana
+    restart: always
+    environment:
+      - SERVER_NAME=dokandar-apm-kibana
+      - SERVER_HOST=0.0.0.0
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD=${KIBANA_PASSWORD:?run setup.sh up}
+      - XPACK_SECURITY_ENABLED=true
+      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=${KIBANA_ENCRYPTION_KEY:?run setup.sh up}
+      - SERVER_PUBLICBASEURL=http://localhost:${KIBANA_PORT:-5601}
+    ports:
+      - "${KIBANA_PORT:-5601}:5601"
+    depends_on:
+      elasticsearch: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:5601/api/status | grep -q '\"level\":\"available\"' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 24
+      start_period: 60s
+    networks: [dokandar_apm_net]
+
+  apm-server:
+    image: docker.elastic.co/apm/apm-server:${ELASTIC_VERSION:-9.4.2}
+    container_name: dokandar_apm_server
+    hostname: apm-server
+    user: apm-server
+    restart: always
+    environment:
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - APM_SECRET_TOKEN=${APM_SECRET_TOKEN:?run setup.sh up}
+    # apm-server config lives in the sibling apm-server.yml (RUM + api_key + secret_token); env-var
+    # interpolation in it is resolved by apm-server at runtime from the container environment.
+    volumes:
+      - ./apm-server.yml:/usr/share/apm-server/apm-server.yml:ro
+    ports:
+      - "${APM_PORT:-8200}:8200"
+    depends_on:
+      elasticsearch: { condition: service_healthy }
+    networks: [dokandar_apm_net]
+
+networks:
+  dokandar_apm_net:
+    name: dokandar_apm_net

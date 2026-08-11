@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package dokandar.recommendation.v1;
+
+// Recommendation — low-latency in-fleet feed serving (architecture §7), called by
+// the BFF / 15-api-gateway to stitch home-screen tiles. The caller MUST set
+// `x-internal-token` metadata = INTERNAL_SERVICE_TOKEN; mismatch → UNAUTHENTICATED.
+// Reads its own Qdrant/Redis/Postgres — no synchronous fan-out on the score path.
+service Recommendation {
+    rpc GetFeed(FeedRequest) returns (FeedResponse);
+}
+
+message FeedRequest {
+    string user_id  = 1;  // the opaque user whose personalized feed is requested
+    int32  size     = 2;  // page size (clamped server-side; default 30, max 100)
+    string strategy = 3;  // optional hint: for_you (default) | cold_start
+}
+
+message FeedResponse {
+    repeated FeedItem items = 1;
+    string strategy = 2;    // the strategy actually served (personal | cold_start | popularity)
+    bool   fallback = 3;    // true → a popularity/trending feed was served (degraded relevance, not an error)
+}
+
+message FeedItem {
+    string product_id = 1;
+    double score      = 2;
+    string reason     = 3;  // personal | cold_start | popularity | similar
+}

@@ -1,0 +1,127 @@
+---
+# DOKANDAR — FULL PLATFORM, ONE COMMAND, ZERO MANUAL STEPS:
+#
+#   cd infra && ansible-playbook site.yml -K
+#
+# (-K asks for your sudo password ONCE — needed only to start the OpenVPN client.)
+#
+# Stages (each idempotent, each re-runnable alone via --tags):
+#   vpn      : 01 terraform apply -> OpenVPN install (SSM) -> connect the tunnel (daemon)
+#   platform : 02 terraform apply -> utilities + runner IN PARALLEL -> trigger all pipelines
+#   eks      : 03 terraform apply -> add-ons (ALB/metrics/Reloader/ArgoCD) ->
+#              render envs from utilities creds -> jump-server secrets -> full deploy
+#
+# After this, day-2 is fully automatic: git push -> CI -> ECR -> manifest bump -> ArgoCD.
+
+- name: DOKANDAR full rollout
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  environment:
+    PATH: "{{ lookup('env','HOME') }}/.local/bin:{{ lookup('env','PATH') }}"
+  vars:
+    infra: "{{ playbook_dir }}"
+    repo_root: "{{ playbook_dir }}/.."
+    group_id: 134171164
+  tasks:
+    # ---------------------------------------------------------------- stage: vpn
+    - name: "[vpn] terraform apply — VPC + OpenVPN server"
+      ansible.builtin.shell: terraform init -input=false >/dev/null && terraform apply -auto-approve -input=false
+      args: { chdir: "{{ infra }}/01-vpn-setup/terraform" }
+      changed_when: true
+      tags: [vpn]
+
+    - name: "[vpn] install/configure OpenVPN over SSM (waits for agent)"
+      ansible.builtin.command: ansible-playbook -i inventory.ini playbook.yml
+      args: { chdir: "{{ infra }}/01-vpn-setup/ansible" }
+      changed_when: true
+      tags: [vpn]
+
+    - name: "[vpn] tunnel already up?"
+      ansible.builtin.command: ip link show tun0
+      register: tun
+      failed_when: false
+      changed_when: false
+      tags: [vpn, platform]
+
+    - name: "[vpn] connect the VPN (daemonized — survives this playbook)"
+      become: true
+      ansible.builtin.command: openvpn --config {{ infra }}/01-vpn-setup/vpn-clients/admin_user.ovpn --daemon dokandar-vpn
+      when: tun.rc != 0
+      tags: [vpn, platform]
+
+    - name: "[vpn] wait for tun0"
+      ansible.builtin.command: ip link show tun0
+      register: tun2
+      until: tun2.rc == 0
+      retries: 12
+      delay: 5
+      changed_when: false
+      when: tun.rc != 0
+      tags: [vpn, platform]
+
+    # ------------------------------------------------------------ stage: platform
+    - name: "[platform] ensure the MANIFEST_PUSH_TOKEN group CI variable exists"
+      ansible.builtin.uri:
+        url: "https://gitlab.com/api/v4/groups/{{ group_id }}/variables"
+        method: POST
+        headers: { PRIVATE-TOKEN: "{{ lookup('file', repo_root ~ '/.gitlab_token') | trim }}" }
+        body_format: form-urlencoded
+        body:
+          key: MANIFEST_PUSH_TOKEN
+          value: "{{ lookup('file', repo_root ~ '/.gitlab_token') | trim }}"
+          masked: "true"
+          protected: "false"
+        status_code: [201, 400]   # 400 = already exists
+      no_log: true
+      tags: [platform]
+
+    - name: "[platform] terraform apply — runner + utilities + ECR + KMS"
+      ansible.builtin.shell: terraform init -input=false >/dev/null && terraform apply -auto-approve -input=false
+      args: { chdir: "{{ infra }}/02-platform-setup/terraform" }
+      changed_when: true
+      tags: [platform]
+
+    - name: "[platform] utilities ∥ runner (parallel) + pipeline triggers (1-2h of builds start here)"
+      ansible.builtin.command: ansible-playbook -i inventory.ini deploy.yml
+      args: { chdir: "{{ infra }}/02-platform-setup/ansible" }
+      changed_when: true
+      tags: [platform]
+
+    # ----------------------------------------------------------------- stage: eks
+    - name: "[eks] terraform apply — cluster + 3 node pools (~15 min)"
+      ansible.builtin.shell: terraform init -input=false >/dev/null && terraform apply -auto-approve -input=false
+      args: { chdir: "{{ infra }}/03-eks-setup/terraform" }
+      changed_when: true
+      tags: [eks]
+
+    - name: "[eks] add-ons + env rendering + jump-server secrets"
+      ansible.builtin.command: ansible-playbook setup.yml
+      args: { chdir: "{{ infra }}/03-eks-setup/ansible" }
+      changed_when: true
+      tags: [eks]
+
+    - name: "[eks] first deploy (namespaces -> config+secrets -> workloads -> netpol)"
+      ansible.builtin.command: ansible-playbook setup.yml --tags deploy
+      args: { chdir: "{{ infra }}/03-eks-setup/ansible" }
+      changed_when: true
+      tags: [eks]
+
+    - name: "[eks] where is everything?"
+      ansible.builtin.shell: |
+        echo "Frontend : http://$(kubectl -n frontend get ingress dokandar-frontend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
+        echo "ArgoCD   : cd {{ infra }}/03-eks-setup && ./argocd-info.sh"
+        kubectl get pods -A --no-headers | awk '{print $4}' | sort | uniq -c
+      register: summary
+      changed_when: false
+      tags: [eks]
+
+    - ansible.builtin.debug: { var: summary.stdout_lines }
+      tags: [eks]
+
+    # ------------------------------------------------------------ stage: downsize
+    - name: "[downsize] wait for all image builds, then shrink the runner to t3.small"
+      ansible.builtin.command: ansible-playbook downsize-runner.yml
+      args: { chdir: "{{ infra }}/02-platform-setup/ansible" }
+      changed_when: true
+      tags: [downsize]

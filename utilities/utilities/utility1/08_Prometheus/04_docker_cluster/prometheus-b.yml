@@ -1,0 +1,10 @@
+# DOKANDAR — Prometheus replica B (HA). Identical to replica A except external_labels.replica=b.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    replica: b
+scrape_configs:
+  - job_name: prometheus-ha
+    static_configs:
+      - targets: ["prom-a:9090", "prom-b:9090"]

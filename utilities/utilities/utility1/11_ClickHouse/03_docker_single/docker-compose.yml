@@ -1,0 +1,29 @@
+# ClickHouse — Docker Compose single-node. Data is a HOST BIND MOUNT (survives `down -v`).
+# Credentials + ports from .env (setup.sh writes them). Built-in /play SQL console on the HTTP port.
+services:
+  clickhouse:
+    image: ${CH_IMAGE:-clickhouse/clickhouse-server:26.3}
+    container_name: dokandar_clickhouse_docker_single
+    restart: always
+    environment:
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?set in .env}
+      # let the configured user log in over TCP/HTTP from off-box (SG-fenced)
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports:
+      - "${CLICKHOUSE_HTTP_PORT:-8123}:8123"
+      - "${CLICKHOUSE_TCP_PORT:-9000}:9000"
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - type: bind
+        source: ${DATA_ROOT:-/data}/clickhouse_docker
+        target: /var/lib/clickhouse
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8123/ping | grep -q Ok || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s

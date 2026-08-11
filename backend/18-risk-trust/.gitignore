@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+build/
+*.egg-info/
+env/.env.dev
+env/.env.stage
+env/.env.prod
+env/components-creds.txt
+env/env.txt
+data/local/result.json
+data/cloud/result.json
+env/.env.*

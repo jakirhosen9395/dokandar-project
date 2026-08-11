@@ -1,0 +1,52 @@
+---
+# Create ONE VPN client and download its profile. Parameter: vpn_user.
+# Re-usable by the main play (admin_user) and by create-user.yml (any name).
+- name: Build the client certificate ({{ vpn_user }})
+  ansible.builtin.command:
+    cmd: "./easyrsa build-client-full {{ vpn_user }} nopass"
+    chdir: "{{ openvpn_easyrsa_dir }}"
+    creates: "{{ openvpn_pki_dir }}/issued/{{ vpn_user }}.crt"
+  environment:
+    EASYRSA_BATCH: "1"
+
+- name: Read CA certificate
+  ansible.builtin.slurp:
+    src: "{{ openvpn_pki_dir }}/ca.crt"
+  register: ca_content
+
+- name: Read client certificate
+  ansible.builtin.slurp:
+    src: "{{ openvpn_pki_dir }}/issued/{{ vpn_user }}.crt"
+  register: client_cert_content
+
+- name: Read client key
+  ansible.builtin.slurp:
+    src: "{{ openvpn_pki_dir }}/private/{{ vpn_user }}.key"
+  register: client_key_content
+
+- name: Read tls-crypt key
+  ansible.builtin.slurp:
+    src: "{{ openvpn_server_dir }}/tls-crypt.key"
+  register: tls_crypt_content
+
+- name: Render {{ vpn_user }}.ovpn on the server
+  ansible.builtin.template:
+    src: client.ovpn.j2
+    dest: "{{ openvpn_server_dir }}/{{ vpn_user }}.ovpn"
+    mode: "0600"
+
+- name: Verify {{ vpn_user }}.ovpn was created
+  ansible.builtin.stat:
+    path: "{{ openvpn_server_dir }}/{{ vpn_user }}.ovpn"
+  register: ovpn_file
+
+- name: Assert the .ovpn exists
+  ansible.builtin.assert:
+    that: ovpn_file.stat.exists
+    fail_msg: "{{ vpn_user }}.ovpn was not generated on the server"
+
+- name: Fetch {{ vpn_user }}.ovpn to vpn-clients/ locally
+  ansible.builtin.fetch:
+    src: "{{ openvpn_server_dir }}/{{ vpn_user }}.ovpn"
+    dest: "{{ playbook_dir }}/../vpn-clients/{{ vpn_user }}.ovpn"
+    flat: true

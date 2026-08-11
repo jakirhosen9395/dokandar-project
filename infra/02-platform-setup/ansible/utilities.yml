@@ -1,0 +1,21 @@
+---
+# PARTIAL: utilities host only (Docker + the 16-tool data tier). VPN required.
+#   ansible-playbook -i inventory.ini utilities.yml
+- name: Read the GitLab PAT (for the private utilities repo clone)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir }}/../../.."
+  tasks:
+    - name: Read token + build authed repo URL
+      ansible.builtin.set_fact:
+        utilities_repo: "https://oauth2:{{ lookup('file', repo_root ~ '/.gitlab_token') | trim }}@gitlab.com/learningdevopstools/utilities/utilities.git"
+      no_log: true
+
+- name: Utilities host — Docker + data tier
+  hosts: utilities
+  gather_facts: true
+  vars:
+    utilities_repo: "{{ hostvars['localhost']['utilities_repo'] }}"
+  roles: [data-tier]

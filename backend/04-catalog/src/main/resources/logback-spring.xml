@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Canonical fleet pretty-JSON-on-stdout. Each log event renders as a small JSON
+  object carrying the Elastic APM trace ids (injected into MDC by the -javaagent)
+  when present, so stdout lines join to APM. Mongo + ES shipping is a separate
+  non-blocking appender (FleetLogAppender) added in the full build.
+-->
+<configuration scan="false">
+
+  <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>{%n  "asctime": "%date{yyyy-MM-dd HH:mm:ss.SSS}",%n  "name": "%logger{0}",%n  "levelname": "%level",%n  "message": "%replace(%replace(%msg){'\\','\\\\'}){'"','\\"'}",%n  "trace.id": "%mdc{trace.id:-}",%n  "transaction.id": "%mdc{transaction.id:-}"%n}%n</pattern>
+    </encoder>
+  </appender>
+
+  <!-- Sinks 2 + 3: Mongo + Elasticsearch, off-thread (bounded queue, daemon drainer). -->
+  <appender name="FLEET" class="com.dokandar.catalog.observability.FleetLogAppender"/>
+
+  <root level="INFO">
+    <appender-ref ref="JSON"/>
+    <appender-ref ref="FLEET"/>
+  </root>
+
+  <logger name="org.springframework"                    level="WARN"/>
+  <logger name="org.springframework.boot"               level="WARN"/>
+  <logger name="org.springframework.boot.autoconfigure" level="WARN"/>
+  <logger name="org.springframework.kafka"              level="WARN"/>
+  <logger name="org.apache.kafka"                       level="WARN"/>
+  <logger name="org.hibernate"                          level="WARN"/>
+  <logger name="org.hibernate.orm.deprecation"          level="ERROR"/>
+  <logger name="com.zaxxer.hikari"                      level="WARN"/>
+  <logger name="io.netty"                               level="WARN"/>
+  <logger name="io.grpc"                                level="WARN"/>
+  <logger name="org.apache.catalina"                    level="WARN"/>
+  <logger name="org.apache.coyote"                      level="WARN"/>
+  <logger name="org.mongodb.driver"                     level="WARN"/>
+  <logger name="com.dokandar.catalog"                   level="INFO"/>
+</configuration>

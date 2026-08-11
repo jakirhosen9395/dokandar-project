@@ -1,0 +1,55 @@
+# env/components-creds.example.txt — infra-creds template for 08-review (### NN_Service format).
+#
+# REAL secrets go in env/components-creds.txt (GITIGNORED) — never in this committed
+# .example file. Workflow:
+#   cp env/components-creds.example.txt env/components-creds.txt
+#   $EDITOR env/components-creds.txt        # paste your REAL infra creds (the full ### dump)
+#   chmod 600 env/components-creds.txt
+#   ./env/init-env.sh .env.dev             # renders env/.env.dev
+#
+# init-env.sh reads env/components-creds.txt (gitignored). Paste your FULL infra status
+# dump (all ### blocks); 08-review uses only these:
+#   01_PostgreSQL 02_MongoDB 03_Elasticsearch 05_Kafka 07_Elastic_APM.
+# 08-review is a search/review service, so it wires BOTH Elasticsearch instances:
+#   - block 07_Elastic_APM `elasticsearch` (:9200) = the application LOG SINK (logs-app-08-review-*)
+#   - block 03_Elasticsearch (:9201)              = the business review-SEARCH store (dokandar-reviews)
+#
+# 08-review is VERIFY-ONLY: it does NOT mint JWT keys. Paste 01-auth's rendered
+# JWT_PUBLIC_KEY_B64 + INTERNAL_SERVICE_TOKEN into the ### Auth_Identity block below
+# (from 01-auth's env/.env.dev). If left as placeholders, init-env.sh falls back to
+# AUTH_ENV_FILE auto-discovery (/opt/dokandar/01-auth/env/.env.dev).
+
+### 01_PostgreSQL
+   endpoint       postgresql://<user>:<password>@<host>:5432/postgres
+   host:port      <host>:5432
+   user           <user>
+   password       <password>
+
+### 02_MongoDB
+   endpoint       mongodb://<user>:<password>@<host>:27017/?authSource=admin
+   host:port      <host>:27017
+   user           <user>
+   password       <password>
+
+### 03_Elasticsearch
+   endpoint       http://<user>:<password>@<host>:9201
+   host:port      <host>:9201
+   user           <user>
+   password       <password>
+
+### 05_Kafka
+   bootstrap      <host>:9092
+   ui             http://<host>:8080
+   auth           none (PLAINTEXT)
+
+### 07_Elastic_APM
+   elasticsearch  http://elastic:<elastic-pass>@<host>:9200
+   apm-ingest     http://<host>:8200  (Bearer token)
+   apm-token      <apm-token>
+   kibana-ui      http://<host>:5601  (login: elastic)
+   elastic-pass   <elastic-pass>
+   kibana_system  <kibana-system-pass>
+
+### Auth_Identity        # paste from 01-auth's rendered env/.env.dev (08-review is verify-only; it NEVER mints keys)
+   auth_service_public_key   <paste 01-auth .env.dev JWT_PUBLIC_KEY_B64>
+   internal_service_token    <paste 01-auth .env.dev INTERNAL_SERVICE_TOKEN>

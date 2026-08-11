@@ -1,0 +1,92 @@
+
+### 01_PostgreSQL
+   endpoint       postgresql://postgres:RlOnMXZgabqJM5vsh7sNREjQ@172.31.36.11:5432/postgres
+   host:port      172.31.36.11:5432
+   user           postgres
+   password       RlOnMXZgabqJM5vsh7sNREjQ
+
+### 02_MongoDB
+   endpoint       mongodb://dokandar:K2Ye2LVf6VkLxJ8UaHHcnFND@172.31.36.11:27017/?authSource=admin
+   host:port      172.31.36.11:27017
+   user           dokandar
+   password       K2Ye2LVf6VkLxJ8UaHHcnFND
+
+### 03_Elasticsearch
+   endpoint       http://elastic:EPHp7GnlIPfzFo8lLDPtZrv8@172.31.36.11:9201
+   host:port      172.31.36.11:9201
+   user           elastic
+   password       EPHp7GnlIPfzFo8lLDPtZrv8
+
+### 04_Redis
+   endpoint       redis://default:Z0LLaTmonoZwoF3LS7mBGDhK@172.31.36.11:6379/0
+   host:port      172.31.36.11:6379
+   user           default
+   password       Z0LLaTmonoZwoF3LS7mBGDhK
+
+### 05_Kafka
+   bootstrap      172.31.36.11:9092
+   ui             http://172.31.36.11:8080
+   auth           none (PLAINTEXT)
+
+### 06_RabbitMQ
+   amqp-url       amqp://dokandar:JiBXcfL18E4xKDCVUQosuUAX@172.31.36.11:5672/
+   host:port      172.31.36.11:5672
+   user           dokandar
+   password       JiBXcfL18E4xKDCVUQosuUAX
+   ui             http://172.31.36.11:15672
+
+### 07_Elastic_APM
+   elasticsearch  http://elastic:b4160b92ffb2c33c982530100947ea24252cce8c@172.31.36.11:9200
+   apm-ingest     http://172.31.36.11:8200  (Bearer token)
+   apm-token      9e0224058af601a81cf44500457bcb5d7eaaecb8
+   kibana-ui      http://172.31.36.11:5601  (login: elastic)
+   elastic-pass   b4160b92ffb2c33c982530100947ea24252cce8c
+   kibana_system  d3dffb2f2788fed95273919321c81849553e6c6b
+
+### 10_RustFS
+   s3-endpoint    http://172.31.36.11:9002
+   console-ui     http://172.31.36.11:9001
+   access-key     98699db51ab345314019
+   secret-key     f83ed7ca2a70bc2b17720ea8570d26e7ec0fba51
+
+### 11_ClickHouse
+   http           http://172.31.36.11:8123
+   native-tcp     172.31.36.11:9000
+   user           default
+   password       02ce45dc1e866f4d40093dbf
+   ui             http://172.31.36.11:8123/play
+
+### 12_Qdrant
+   rest           http://172.31.36.11:6333
+   grpc           172.31.36.11:6334
+   api-key        9169af6555dfeaa5759ab51f
+   ui             http://172.31.36.11:6333/dashboard
+
+### 13_Neo4j
+   bolt           bolt://172.31.36.11:7687
+   browser-ui     http://172.31.36.11:7474
+   user           neo4j
+   password       df10d20e99bfcdfcdd273c50
+
+### 14_ScyllaDB
+   cql            172.31.36.11:9042
+   auth           none
+
+### 15_NATS
+   client-url     nats://3de7c248bcc88a778f0cf45f@172.31.36.11:4222
+   host:port      172.31.36.11:4222
+   auth-token     3de7c248bcc88a778f0cf45f
+   monitoring     http://172.31.36.11:8222
+
+### 16_Temporal
+   grpc           172.31.36.11:7233
+   web-ui         http://172.31.36.11:8233
+   auth           none
+
+
+# --- Auth_Identity — auth's PUBLIC key + shared east-west token (verify-only). ---
+# Filled AFTER 01-auth is started + rendered: paste 01-auth's .env.dev
+# JWT_PUBLIC_KEY_B64 and INTERNAL_SERVICE_TOKEN here (never a private key).
+### Auth_Identity
+   auth_service_public_key   LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUlJQklqQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FROEFNSUlCQ2dLQ0FRRUF0YjBkaWNrS1RvZDlwNXRWaWhMNgpTK1NBZ2IzUFo3bHJVeFdZU0VUR1ZHTjRDaHpZSlZjSmdhUXR2NXNndUtJL0RxWGVsNCs5WnRoT1BFZnh3RCtPCmJIUzdjNk04Yjh0d0doREtmRkZMeGpKREhkbWJxYkwxNHNMOVNGK0lnSVBzZXYxTmNFUW1wU01iNWFmMlNneE4KMC9HUlRrcjhheUR5RzJleXdrdTBqcEdndCtTK1NpNEtmZmZvM0c3OTBSdjlGdUZuUzJEZDVzZldXOVphdEhPWgoxQzZwVUlVcFVmTkxSc0ZISXc2QXhJM0lOZ2kzazVIM0lsM1MxQ2xHR1ZsdlcwSlc1dGU0OGRyUVFNRTBFTUNPCkdZK2FlSGhTcU1tMmpXZEQ2WWJuWksyeE1JZ2Z1aUVlSVhjRExOR0lkWEoyY3lRTHpPTXhUWE8vSWVQSTRTc3MKOXdJREFRQUIKLS0tLS1FTkQgUFVCTElDIEtFWS0tLS0t
+   internal_service_token    9a6cf8f3369c2f139ee89a5448a345a6f7b2e87a11d79c92e8a955dcfcafda7e

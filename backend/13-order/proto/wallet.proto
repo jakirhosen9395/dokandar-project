@@ -1,0 +1,44 @@
+syntax = "proto3";
+package dokandar.wallet.v1;
+option java_package = "dokandar.wallet.v1";
+option java_multiple_files = true;
+option go_package = "github.com/dokandar/dokandar-wallet/internal/grpcsrv/walletpb;walletpb";
+
+// East-west wallet ledger API. 13-order is a CLIENT: DebitWallet on placement,
+// CreditWallet for compensation (DISTINCT idempotency key -> no double-refund).
+// Generated Java stubs land in package `dokandar.wallet.v1` (no java_package set
+// on the source proto — kept verbatim from 10-wallet). Guarded by x-internal-token.
+service Wallet {
+  rpc GetBalance(GetBalanceRequest) returns (BalanceResponse);
+  rpc DebitWallet(DebitRequest) returns (BalanceResponse);
+  rpc CreditWallet(CreditRequest) returns (BalanceResponse);
+}
+
+message GetBalanceRequest {
+  string user_id = 1;
+}
+
+message DebitRequest {
+  string user_id = 1;
+  int64  amount_minor = 2;
+  string idempotency_key = 3;  // effectively-once
+  string order_id = 4;         // optional
+  string kind = 5;             // optional, default order_payment
+}
+
+message CreditRequest {
+  string user_id = 1;
+  int64  amount_minor = 2;
+  string idempotency_key = 3;
+  string order_id = 4;
+  string kind = 5;             // refund_to_wallet | cashback | topup | ...
+}
+
+message BalanceResponse {
+  string user_id = 1;
+  int64  balance_minor = 2;
+  int64  available_minor = 3;
+  string currency = 4;
+  string status = 5;
+  string entry_id = 6;         // set on debit/credit
+}

@@ -1,0 +1,43 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Cart {
+  id        String     @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String     @unique
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  @@map("carts")
+}
+
+type CartItem {
+  lineId         String
+  shopId         String
+  productId      String
+  variantId      String
+  quantity       Int
+  unitPriceMinor Int      @default(0)
+  salePriceMinor Int?
+  attributes     Json?
+  snapshotAt     DateTime @default(now())
+  priceStale     Boolean  @default(false)
+}
+
+model Wishlist {
+  id     String         @id @default(auto()) @map("_id") @db.ObjectId
+  userId String         @unique
+  items  WishlistItem[]
+  @@map("wishlists")
+}
+
+type WishlistItem {
+  lineId    String
+  productId String
+  variantId String?
+  addedAt   DateTime @default(now())
+}

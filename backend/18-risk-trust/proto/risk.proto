@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package dokandar.risk.v1;
+
+// Risk.ScoreCheckout | ScoreCOD (§7) — called by 06-cart (quote build) + 13-order (place)
+// on the checkout hot path (<100 ms p99). Requires x-internal-token metadata =
+// INTERNAL_SERVICE_TOKEN (constant-time); mismatch → UNAUTHENTICATED. The response is a
+// DECISION ONLY — never the numeric score or thresholds (§12, the load-bearing security rule).
+service Risk {
+    rpc ScoreCheckout (ScoreRequest) returns (ScoreResponse);
+    rpc ScoreCOD      (ScoreRequest) returns (ScoreResponse);
+}
+
+message ScoreRequest {
+    string user_id        = 1;
+    string device_id      = 2;
+    string ip             = 3;
+    int32  amount_minor   = 4;
+    string order_id       = 5;
+    string shop_id        = 6;
+    string payment_method = 7;
+}
+
+message ScoreResponse {
+    string decision           = 1;   // allow | review | deny
+    repeated string reason_codes = 2; // OPAQUE — no score, no thresholds
+}

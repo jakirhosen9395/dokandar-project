@@ -1,0 +1,45 @@
+# ScyllaDB — Docker Compose HA cluster: 3 nodes, one ring (cluster_name=dokandar). scylla1 is the seed;
+# scylla2/scylla3 join it. Nodes MUST bootstrap ONE AT A TIME — depends_on(service_healthy) serialises the
+# join. With a keyspace at replication_factor=3 every node holds a full copy, so the ring survives one node
+# loss. Per-node data = HOST bind mounts (survive `down -v`). developer-mode + capped resources for a shared box.
+x-scylla: &scylla
+  image: ${SCYLLA_IMAGE:-scylladb/scylla:2026.1}
+  restart: always
+  healthcheck:
+    test: ["CMD-SHELL", "nodetool status | grep -q '^UN' || exit 1"]
+    interval: 15s
+    timeout: 10s
+    retries: 12
+    start_period: 30s
+
+services:
+  scylla1:
+    <<: *scylla
+    container_name: dokandar_scylla_c1
+    command: ["--seeds=scylla1", "--cluster-name", "${SCYLLA_CLUSTER_NAME:-dokandar}", "--developer-mode", "1", "--smp", "1", "--memory", "1G", "--overprovisioned", "1"]
+    ports:
+      - "${SCY_CQL1:-9042}:9042"
+    volumes:
+      - ${DATA_ROOT:-/data}/scylla_cluster/n1:/var/lib/scylla
+  scylla2:
+    <<: *scylla
+    container_name: dokandar_scylla_c2
+    command: ["--seeds=scylla1", "--cluster-name", "${SCYLLA_CLUSTER_NAME:-dokandar}", "--developer-mode", "1", "--smp", "1", "--memory", "1G", "--overprovisioned", "1"]
+    depends_on:
+      scylla1:
+        condition: service_healthy
+    ports:
+      - "${SCY_CQL2:-9043}:9042"
+    volumes:
+      - ${DATA_ROOT:-/data}/scylla_cluster/n2:/var/lib/scylla
+  scylla3:
+    <<: *scylla
+    container_name: dokandar_scylla_c3
+    command: ["--seeds=scylla1", "--cluster-name", "${SCYLLA_CLUSTER_NAME:-dokandar}", "--developer-mode", "1", "--smp", "1", "--memory", "1G", "--overprovisioned", "1"]
+    depends_on:
+      scylla2:
+        condition: service_healthy
+    ports:
+      - "${SCY_CQL3:-9044}:9042"
+    volumes:
+      - ${DATA_ROOT:-/data}/scylla_cluster/n3:/var/lib/scylla

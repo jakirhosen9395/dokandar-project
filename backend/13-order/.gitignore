@@ -1,0 +1,7 @@
+env/.env.*
+env/components-creds.txt
+env/env.txt
+target/
+*.pem
+data/*/result.json
+*.class

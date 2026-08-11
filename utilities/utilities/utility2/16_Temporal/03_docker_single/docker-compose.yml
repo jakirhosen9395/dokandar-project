@@ -1,0 +1,17 @@
+# Temporal — Docker Compose single-node (dev server). The admin-tools image bundles the `temporal` CLI,
+# which runs the embedded dev server (`server start-dev`) with SQLite persistence + the built-in Web UI.
+# The SQLite file is on a HOST bind mount (survives `down -v`). No auth (dev server).
+services:
+  temporal:
+    image: ${TEMPORAL_ADMINTOOLS_IMAGE:-temporalio/admin-tools:latest}
+    container_name: dokandar_temporal_docker_single
+    restart: always
+    entrypoint: ["temporal"]
+    command: ["server","start-dev","--ip","0.0.0.0","--port","7233","--ui-ip","0.0.0.0","--ui-port","8233","--db-filename","/data/temporal.db","--namespace","default","--log-level","warn"]
+    ports:
+      - "${TEMPORAL_GRPC_PORT:-7233}:7233"
+      - "${TEMPORAL_UI_PORT:-8233}:8233"
+    volumes:
+      - type: bind
+        source: ${DATA_ROOT:-/data}/temporal_docker
+        target: /data

@@ -1,0 +1,64 @@
+# Neo4j — Docker Compose HA cluster: 3 PRIMARY servers (Enterprise, autonomous clustering). The 3 primaries
+# form one Raft group; writes go to the elected leader, every primary holds a full copy, and quorum (2 of 3)
+# tolerates one node loss. Enterprise edition under the EVALUATION licence (dev/test only — NOT production).
+# Per-node data are HOST bind mounts (survive `down -v`). Config is via NEO4J_<key> env (dots->_, _->__);
+# each node differs ONLY in server.default_advertised_address (the rest of the advertised ports derive from it).
+x-neo4j: &neo4j
+  image: ${NEO4J_IMAGE:-neo4j:2026.05.0-enterprise}
+  restart: always
+  environment: &neo4jenv
+    NEO4J_ACCEPT_LICENSE_AGREEMENT: "eval"
+    NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:?set in .env}
+    NEO4J_server_default__listen__address: "0.0.0.0"
+    NEO4J_initial_server_mode__constraint: "PRIMARY"
+    NEO4J_server_cluster_system__database__mode: "PRIMARY"
+    NEO4J_initial_dbms_default__primaries__count: "3"
+    NEO4J_dbms_cluster_minimum__initial__system__primaries__count: "3"
+    NEO4J_dbms_cluster_discovery_resolver__type: "LIST"
+    NEO4J_dbms_cluster_endpoints: "neo4j1:6000,neo4j2:6000,neo4j3:6000"
+    # pin the discovery + raft listen ports to match the endpoints above (don't rely on version defaults).
+    NEO4J_server_cluster_listen__address: "0.0.0.0:6000"
+    NEO4J_server_cluster_raft_listen__address: "0.0.0.0:7000"
+    # conservative heap so 3 servers + JVM overhead fit a ~6.4 GB box (an OOM-kill of one node stalls the
+    # whole cluster, since minimum_initial_system_primaries_count=3 is all-or-nothing).
+    NEO4J_server_memory_heap_initial__size: "512m"
+    NEO4J_server_memory_heap_max__size: "512m"
+    NEO4J_server_memory_pagecache_size: "512m"
+
+services:
+  neo4j1:
+    <<: *neo4j
+    container_name: dokandar_neo4j_c1
+    hostname: neo4j1
+    environment:
+      <<: *neo4jenv
+      NEO4J_server_default__advertised__address: "neo4j1"
+    ports:
+      - "${N_HTTP1:-7474}:7474"
+      - "${N_BOLT1:-7687}:7687"
+    volumes:
+      - ${DATA_ROOT:-/data}/neo4j_cluster/n1:/data
+  neo4j2:
+    <<: *neo4j
+    container_name: dokandar_neo4j_c2
+    hostname: neo4j2
+    environment:
+      <<: *neo4jenv
+      NEO4J_server_default__advertised__address: "neo4j2"
+    ports:
+      - "${N_HTTP2:-7475}:7474"
+      - "${N_BOLT2:-7688}:7687"
+    volumes:
+      - ${DATA_ROOT:-/data}/neo4j_cluster/n2:/data
+  neo4j3:
+    <<: *neo4j
+    container_name: dokandar_neo4j_c3
+    hostname: neo4j3
+    environment:
+      <<: *neo4jenv
+      NEO4J_server_default__advertised__address: "neo4j3"
+    ports:
+      - "${N_HTTP3:-7476}:7474"
+      - "${N_BOLT3:-7689}:7687"
+    volumes:
+      - ${DATA_ROOT:-/data}/neo4j_cluster/n3:/data

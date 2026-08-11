@@ -1,0 +1,407 @@
+---
+# DOKANDAR EKS — the JUMP SERVER is the sole control host.
+#
+# You launch this from your laptop (VPN connected), but EVERY task runs on the
+# jump server over SSH: it installs the tooling, clones the repos from GitLab,
+# writes its own kubeconfig (via its instance profile — no AWS keys on the box),
+# installs the cluster add-ons, renders every service env, and deploys all
+# services as per-service ArgoCD apps through the `argocd` CLI.
+#
+#   ansible-playbook -i inventory.ini setup.yml                # bootstrap + add-ons + envs (steps 1-3)
+#   ansible-playbook -i inventory.ini setup.yml --tags deploy  # + create/sync all service apps (step 4)
+#
+# Prereqs: terraform applied (writes inventory.ini + eks-vars.yml + the jump .pem);
+#          VPN connected; GitLab PAT in <repo-root>/.gitlab_token;
+#          02-platform-setup's data-tier creds present locally
+#          (infra/02-platform-setup/ansible/.creds/infra-creds.txt).
+
+# ============================================================================
+# PLAY 1 — bootstrap the jump server's tooling (root)
+# ============================================================================
+- name: Bootstrap the jump server as the EKS control host
+  hosts: jump
+  gather_facts: true
+  become: true
+  vars_files: [eks-vars.yml]
+  vars:
+    kubectl_minor: "1.35"
+  tasks:
+    - name: Base packages
+      ansible.builtin.apt:
+        name: [git, curl, unzip, jq, python3, python3-pip, openssl, ca-certificates]
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install AWS CLI v2 (auth to EKS via the instance profile)
+      ansible.builtin.shell: |
+        command -v aws >/dev/null && exit 0
+        cd /tmp
+        curl -sL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o awscliv2.zip
+        unzip -q -o awscliv2.zip
+        ./aws/install --update
+        echo installed
+      register: awscli
+      changed_when: "'installed' in awscli.stdout"
+
+    - name: Install kubectl {{ kubectl_minor }} (matches the cluster minor)
+      ansible.builtin.shell: |
+        set -e
+        want="$(curl -sL https://dl.k8s.io/release/stable-{{ kubectl_minor }}.txt)"
+        have="$(kubectl version --client -o json 2>/dev/null \
+          | python3 -c 'import json,sys;print(json.load(sys.stdin)["clientVersion"]["gitVersion"])' 2>/dev/null || echo none)"
+        [ "$want" = "$have" ] && exit 0
+        curl -sLo /usr/local/bin/kubectl "https://dl.k8s.io/release/${want}/bin/linux/amd64/kubectl"
+        chmod +x /usr/local/bin/kubectl
+        echo changed
+      register: kctl
+      changed_when: "'changed' in kctl.stdout"
+
+    - name: Install helm
+      ansible.builtin.shell: |
+        command -v helm >/dev/null && exit 0
+        curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+        echo installed
+      register: helmi
+      changed_when: "'installed' in helmi.stdout"
+
+    - name: Install the argocd CLI
+      ansible.builtin.shell: |
+        command -v argocd >/dev/null && exit 0
+        curl -sLo /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+        chmod +x /usr/local/bin/argocd
+        echo installed
+      register: acli
+      changed_when: "'installed' in acli.stdout"
+
+# ============================================================================
+# PLAY 2 — control the cluster from the jump server (ubuntu user)
+# ============================================================================
+- name: EKS cluster setup + env preparation + GitOps deploy (on the jump server)
+  hosts: jump
+  gather_facts: false
+  become: false
+  vars_files: [eks-vars.yml]
+  vars:
+    workroot: "/home/ubuntu/dokandar"
+    backend_dir: "/home/ubuntu/dokandar/backend"
+    k8s_repo: "/home/ubuntu/dokandar/dokandar-k8s-cluster-setup"
+    envs_out: "/home/ubuntu/dokandar/.envs"
+    creds_file: "/home/ubuntu/dokandar/creds/infra-creds.txt"
+    manifest_repo_url: "git@gitlab.com:learningdevopstools/infra/dokandar-k8s-cluster-setup.git"
+    argocd_deploy_key: "/home/ubuntu/.ssh/argocd_deploy"
+    gitlab_group_url: "https://gitlab.com/learningdevopstools"
+    local_creds_src: "{{ playbook_dir }}/../../02-platform-setup/ansible/.creds/infra-creds.txt"
+    backend_repos:
+      - 00-support
+      - 01-auth
+      - 02-profile
+      - 03-seller
+      - 04-catalog
+      - 05-search
+      - 06-cart
+      - 07-coupon
+      - 08-review
+      - 09-payment
+      - 10-wallet
+      - 11-reporting
+      - 12-media
+      - 13-order
+      - 14-notification
+      - 15-api-gateway
+      - 16-recommendation
+      - 17-shipping
+      - 18-risk-trust
+    # Every service, created IDENTICALLY as its own ArgoCD app via the CLI.
+    services:
+      - { name: dokandar-support,        path: manifest-files/support/00-support,        ns: support }
+      - { name: dokandar-auth,           path: manifest-files/backend/01-auth,            ns: backend }
+      - { name: dokandar-profile,        path: manifest-files/backend/02-profile,         ns: backend }
+      - { name: dokandar-seller,         path: manifest-files/backend/03-seller,          ns: backend }
+      - { name: dokandar-catalog,        path: manifest-files/backend/04-catalog,         ns: backend }
+      - { name: dokandar-search,         path: manifest-files/backend/05-search,          ns: backend }
+      - { name: dokandar-cart,           path: manifest-files/backend/06-cart,            ns: backend }
+      - { name: dokandar-coupon,         path: manifest-files/backend/07-coupon,          ns: backend }
+      - { name: dokandar-review,         path: manifest-files/backend/08-review,          ns: backend }
+      - { name: dokandar-payment,        path: manifest-files/backend/09-payment,         ns: backend }
+      - { name: dokandar-wallet,         path: manifest-files/backend/10-wallet,          ns: backend }
+      - { name: dokandar-reporting,      path: manifest-files/backend/11-reporting,       ns: backend }
+      - { name: dokandar-media,          path: manifest-files/backend/12-media,           ns: backend }
+      - { name: dokandar-order,          path: manifest-files/backend/13-order,           ns: backend }
+      - { name: dokandar-notification,   path: manifest-files/backend/14-notification,    ns: backend }
+      - { name: dokandar-api-gateway,    path: manifest-files/gateway/15-api-gateway,     ns: gateway }
+      - { name: dokandar-recommendation, path: manifest-files/backend/16-recommendation,  ns: backend }
+      - { name: dokandar-shipping,       path: manifest-files/backend/17-shipping,        ns: backend }
+      - { name: dokandar-risk-trust,     path: manifest-files/backend/18-risk-trust,      ns: backend }
+      - { name: dokandar-frontend,       path: manifest-files/frontend/frontend,          ns: frontend }
+  tasks:
+    - name: Read the GitLab PAT from the repo root (on the control node)
+      ansible.builtin.set_fact:
+        gitlab_token: "{{ lookup('file', playbook_dir ~ '/../../../.gitlab_token') | trim }}"
+      no_log: true
+      tags: [always]
+
+    - name: Fail early if the local data-tier creds are missing
+      ansible.builtin.assert:
+        that: local_creds_src is exists
+        fail_msg: >-
+          {{ local_creds_src }} not found on the control node — run
+          02-platform-setup's data-tier play first (it fetches infra-creds.txt).
+      delegate_to: localhost
+      tags: [always]
+
+    - name: Create the jump-server workspace
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ workroot }}"
+        - "{{ backend_dir }}"
+        - "{{ workroot }}/creds"
+      tags: [always]
+
+    - name: Copy the infra creds up to the jump server
+      ansible.builtin.copy:
+        src: "{{ local_creds_src }}"
+        dest: "{{ creds_file }}"
+        mode: "0600"
+      tags: [always]
+
+    - name: Clone the k8s manifest repo (scripts + manifests live here — no laptop dependency)
+      ansible.builtin.git:
+        repo: "https://oauth2:{{ gitlab_token }}@gitlab.com/learningdevopstools/infra/dokandar-k8s-cluster-setup.git"
+        dest: "{{ k8s_repo }}"
+        version: main
+        force: true
+      no_log: true
+      tags: [always]
+
+    - name: Clone every backend service repo (source-code branch)
+      ansible.builtin.git:
+        repo: "{{ gitlab_group_url }}/backend/{{ item }}.git"
+        dest: "{{ backend_dir }}/{{ item }}"
+        version: source-code
+        depth: 1
+        force: true
+      environment:
+        GIT_ASKPASS: /bin/true
+      loop: "{{ backend_repos }}"
+      loop_control: { label: "{{ item }}" }
+      no_log: true
+      tags: [always]
+
+    - name: Point kubectl at the cluster (uses the jump instance profile)
+      ansible.builtin.command: aws eks update-kubeconfig --name {{ cluster_name }} --region {{ region }}
+      changed_when: true
+      tags: [always]
+
+    - name: Wait until both worker nodes are Ready
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          kubectl get nodes --no-headers | awk '$2=="Ready"' | wc -l
+        executable: /bin/bash
+      register: ready
+      until: ready.rc == 0 and (ready.stdout | int) >= 2
+      retries: 40
+      delay: 15
+      changed_when: false
+      failed_when: false
+      tags: [always]
+
+    - name: Abort — nodes never became Ready (show actual kubectl error)
+      ansible.builtin.fail:
+        msg: "{{ ready.stderr | default('no stderr') }}\nReady node count: {{ ready.stdout }}"
+      when: ready.rc != 0 or (ready.stdout | int) < 2
+      tags: [always]
+
+    # ---------------- cluster add-ons ----------------
+    - name: Helm repos
+      ansible.builtin.shell: |
+        helm repo add eks https://aws.github.io/eks-charts >/dev/null
+        helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/ >/dev/null
+        helm repo add stakater https://stakater.github.io/stakater-charts >/dev/null
+        helm repo add argo https://argoproj.github.io/argo-helm >/dev/null
+        helm repo update >/dev/null
+      changed_when: false
+
+    - name: AWS Load Balancer Controller (serves the `alb` Ingress class)
+      ansible.builtin.shell: |
+        helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
+          -n kube-system \
+          --set clusterName={{ cluster_name }} \
+          --set region={{ region }} \
+          --set vpcId={{ vpc_id }} \
+          --set serviceAccount.create=true \
+          --set serviceAccount.name=aws-load-balancer-controller \
+          --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"={{ lb_controller_role_arn }}
+      changed_when: true
+
+    - name: Wait for the ALB controller to be ready (its webhook intercepts Service creates)
+      ansible.builtin.command: kubectl -n kube-system rollout status deployment/aws-load-balancer-controller --timeout=300s
+      changed_when: false
+
+    - name: metrics-server (required by the HPAs; retries while the ALB webhook CA settles)
+      ansible.builtin.shell: helm upgrade --install metrics-server metrics-server/metrics-server -n kube-system
+      register: ms
+      until: ms.rc == 0
+      retries: 12
+      delay: 15
+      changed_when: true
+
+    - name: stakater Reloader (auto-restart pods on config/secret change)
+      ansible.builtin.shell: helm upgrade --install reloader stakater/reloader -n kube-system
+      register: rel
+      until: rel.rc == 0
+      retries: 12
+      delay: 15
+      changed_when: true
+
+    # ---------------- ArgoCD ----------------
+    - name: Install ArgoCD (UI = NodePort 30080 on the workers — see argocd-values.yaml)
+      ansible.builtin.shell: >
+        helm upgrade --install argocd argo/argo-cd -n argocd --create-namespace
+        -f {{ k8s_repo }}/jump-server/argocd-values.yaml
+      register: argo
+      until: argo.rc == 0
+      retries: 12
+      delay: 15
+      changed_when: true
+
+    - name: Wait for the ArgoCD application controller + repo-server
+      ansible.builtin.shell: |
+        kubectl -n argocd rollout status statefulset/argocd-application-controller --timeout=300s
+        kubectl -n argocd rollout status deployment/argocd-repo-server --timeout=300s
+      changed_when: false
+
+    - name: Generate ArgoCD SSH deploy key (idempotent)
+      ansible.builtin.command:
+        cmd: ssh-keygen -t ed25519 -f {{ argocd_deploy_key }} -N "" -C "argocd@dokandar"
+        creates: "{{ argocd_deploy_key }}"
+
+    - name: Read ArgoCD SSH deploy public key
+      ansible.builtin.slurp:
+        src: "{{ argocd_deploy_key }}.pub"
+      register: argocd_pubkey
+
+    - ansible.builtin.debug:
+        msg: |
+          ACTION REQUIRED — add this deploy key to GitLab before ArgoCD can sync:
+          Repo: gitlab.com/learningdevopstools/infra/dokandar-k8s-cluster-setup
+          Settings → Repository → Deploy Keys → add with read-only access:
+          {{ argocd_pubkey.content | b64decode | trim }}
+
+    - name: Register the manifest repo with ArgoCD (SSH deploy key)
+      ansible.builtin.shell: |
+        kubectl -n argocd create secret generic repo-dokandar-k8s \
+          --from-literal=type=git \
+          --from-literal=url={{ manifest_repo_url }} \
+          --from-file=sshPrivateKey={{ argocd_deploy_key }} \
+          --dry-run=client -o yaml | kubectl apply -f -
+        kubectl -n argocd label secret repo-dokandar-k8s \
+          argocd.argoproj.io/secret-type=repository --overwrite
+      no_log: true
+      changed_when: true
+
+    - name: ArgoCD initial admin password
+      ansible.builtin.shell: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
+      register: argopw
+      no_log: true
+      changed_when: false
+      failed_when: false
+
+    - ansible.builtin.debug:
+        msg: "ArgoCD UI: http://<worker-node-ip>:30080 over the VPN — run ../argocd-info.sh on the jump server for the exact IP/password"
+
+    # ---------------- env rendering (from the jump-server workspace) ----------------
+    - name: Seed env/components-creds.txt into every service (for init-env.sh scripts that ignore $CREDS_FILE)
+      ansible.builtin.command: bash seed-creds.sh
+      args: { chdir: "{{ k8s_repo }}/jump-server" }
+      environment:
+        CREDS: "{{ creds_file }}"
+        BACKEND: "{{ backend_dir }}"
+      changed_when: true
+
+    - name: Render every service's env from the utilities creds (01-auth first)
+      ansible.builtin.command: bash render-envs.sh
+      args: { chdir: "{{ k8s_repo }}/jump-server" }
+      environment:
+        BACKEND: "{{ backend_dir }}"
+        CREDS: "{{ creds_file }}"
+        ENVS_OUT: "{{ envs_out }}"
+      changed_when: true
+
+    - name: Populate jump-server secrets (east-west rewritten to cluster DNS)
+      ansible.builtin.command: bash populate-jump-server.sh
+      args: { chdir: "{{ k8s_repo }}/jump-server" }
+      environment:
+        ENVS_OUT: "{{ envs_out }}"
+        JS: "{{ k8s_repo }}/jump-server"
+      changed_when: true
+
+    - name: Verify no Docker bridge addresses remain in secrets
+      ansible.builtin.shell: |
+        count=$(grep -rl '172\.17\.' {{ k8s_repo }}/jump-server/secrets/ | wc -l)
+        echo "Files with 172.17 addresses: $count"
+        [ "$count" -eq 0 ]
+      changed_when: false
+      register: addr_check
+      failed_when: addr_check.rc != 0
+
+    # ================= full deploy (opt-in: --tags deploy) =================
+    - name: Apply namespaces
+      ansible.builtin.command: kubectl apply -f {{ k8s_repo }}/manifest-files/namespaces/
+      tags: [never, deploy]
+
+    - name: Apply ConfigMaps + Secrets from the jump-server folder
+      ansible.builtin.shell: ./apply-config.sh && ./apply-secrets.sh
+      args: { chdir: "{{ k8s_repo }}/jump-server" }
+      tags: [never, deploy]
+
+    - name: Apply the data-collector DaemonSet (node metadata for /data + TENANT mount)
+      ansible.builtin.command: kubectl apply -f {{ k8s_repo }}/manifest-files/system/
+      tags: [never, deploy]
+
+    - name: Apply network policies
+      ansible.builtin.command: kubectl apply -f {{ k8s_repo }}/manifest-files/network/
+      tags: [never, deploy]
+
+    - name: Create every service as its own ArgoCD Application (kubectl apply — no argocd-cm needed)
+      ansible.builtin.shell: |
+        kubectl apply -f - <<'APPEOF'
+        apiVersion: argoproj.io/v1alpha1
+        kind: Application
+        metadata:
+          name: {{ item.name }}
+          namespace: argocd
+          finalizers:
+            - resources-finalizer.argocd.argoproj.io
+        spec:
+          project: default
+          source:
+            repoURL: {{ manifest_repo_url }}
+            targetRevision: main
+            path: {{ item.path }}
+          destination:
+            server: https://kubernetes.default.svc
+            namespace: {{ item.ns }}
+          syncPolicy:
+            automated:
+              prune: true
+              selfHeal: true
+            syncOptions:
+              - ApplyOutOfSyncOnly=true
+        APPEOF
+      loop: "{{ services }}"
+      loop_control: { label: "{{ item.name }}" }
+      changed_when: true
+      tags: [never, deploy]
+
+    - name: Status (pod phase counts)
+      ansible.builtin.shell: kubectl get pods -A --no-headers | awk '{print $4}' | sort | uniq -c
+      register: st
+      changed_when: false
+      tags: [never, deploy]
+
+    - ansible.builtin.debug: { var: st.stdout_lines }
+      tags: [never, deploy]

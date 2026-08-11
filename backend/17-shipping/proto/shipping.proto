@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package dokandar.shipping.v1;
+
+// Shipping.QuoteDelivery (§7) — called by 13-order at checkout (sub-50 ms via cached
+// pricing + precomputed road-graph distances). The canonical method is QuoteDelivery
+// (NOT the older ComputeDeliveryRoute, §22). Requires x-internal-token metadata =
+// INTERNAL_SERVICE_TOKEN, compared constant-time; mismatch → UNAUTHENTICATED.
+service Shipping {
+    rpc QuoteDelivery (QuoteRequest) returns (QuoteResponse);
+}
+
+message QuoteRequest {
+    string sub_order_id  = 1;
+    string upazila_code  = 2;
+    string address_tier  = 3;
+    int32  weight_grams  = 4;
+}
+
+message QuoteResponse {
+    string courier      = 1;
+    int32  fee_minor    = 2;
+    int32  eta_hours    = 3;
+    double distance_km  = 4;
+}

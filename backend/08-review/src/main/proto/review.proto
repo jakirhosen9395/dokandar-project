@@ -1,0 +1,19 @@
+syntax = "proto3";
+package dokandar.review.v1;
+option java_package = "com.dokandar.review.grpc.proto";
+option java_multiple_files = true;
+
+// ReviewQuery.HasPurchased @50051 — east-west; answered from the LOCAL purchase_eligibility
+// projection (consumes order.delivered/refunded); never calls 13-order.
+service ReviewQuery {
+  rpc HasPurchased(HasPurchasedRequest) returns (HasPurchasedResponse);
+}
+message HasPurchasedRequest {
+  string user_id = 1;
+  string product_id = 2;
+  string shop_id = 3;
+}
+message HasPurchasedResponse {
+  bool has_purchased = 1;
+  string order_id = 2;
+}

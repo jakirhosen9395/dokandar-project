@@ -1,0 +1,72 @@
+---
+# PARTIAL: GitLab runner only (install + register + trigger pipelines).
+# Works WITHOUT the VPN (the runner has a public IP).
+#   ansible-playbook -i inventory.ini runner.yml
+- name: Prepare token + create a group runner (control node)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir }}/../../.."
+    group_id: 134171164
+  tasks:
+    - name: Read the GitLab PAT
+      ansible.builtin.set_fact:
+        gitlab_token: "{{ lookup('file', repo_root ~ '/.gitlab_token') | trim }}"
+      no_log: true
+
+    - name: Create a group runner (tag dokandar-runner)
+      ansible.builtin.uri:
+        url: "https://gitlab.com/api/v4/user/runners"
+        method: POST
+        headers: { PRIVATE-TOKEN: "{{ gitlab_token }}" }
+        body_format: form-urlencoded
+        body:
+          runner_type: group_type
+          group_id: "{{ group_id }}"
+          tag_list: dokandar-runner
+          run_untagged: "false"
+          description: "dokandar-runner (ansible)"
+        status_code: 201
+      register: runner_create
+      no_log: true
+
+    - name: Stash the runner token
+      ansible.builtin.set_fact:
+        runner_token: "{{ runner_create.json.token }}"
+      no_log: true
+
+- name: Install + register the GitLab runner, then trigger pipelines
+  hosts: runner
+  gather_facts: true
+  vars:
+    gitlab_token: "{{ hostvars['localhost']['gitlab_token'] }}"
+    runner_token: "{{ hostvars['localhost']['runner_token'] }}"
+    group_id: 134171164
+  tasks:
+    - name: Install + register
+      ansible.builtin.include_role:
+        name: gitlab-runner
+
+    - name: List all group projects
+      ansible.builtin.uri:
+        url: "https://gitlab.com/api/v4/groups/{{ group_id }}/projects?include_subgroups=true&per_page=100&simple=true"
+        headers: { PRIVATE-TOKEN: "{{ gitlab_token }}" }
+      register: projects
+      delegate_to: localhost
+      become: false
+      no_log: true
+
+    - name: Trigger a pipeline for each backend + frontend repo
+      ansible.builtin.uri:
+        url: "https://gitlab.com/api/v4/projects/{{ item.id }}/pipeline"
+        method: POST
+        headers: { PRIVATE-TOKEN: "{{ gitlab_token }}" }
+        body_format: form-urlencoded
+        body: { ref: "source-code" }   # the code branch (default_branch is a placeholder README)
+        status_code: [201, 400]
+      loop: "{{ projects.json | selectattr('path_with_namespace', 'search', '/backend/[0-9]|ui/frontend$') | rejectattr('path_with_namespace', 'search', 'deletion_scheduled') | list }}"
+      loop_control: { label: "{{ item.path_with_namespace }}" }
+      delegate_to: localhost
+      become: false
+      no_log: true

@@ -1,0 +1,48 @@
+# DOKANDAR utility — RabbitMQ 4.x · Docker Compose HA cluster (3 nodes, quorum queues).
+# rabbit-1/2/3 share one Erlang cookie and form a cluster (setup.sh joins 2+3 to node 1). Clients connect
+# to node 1's published AMQP/Management ports (the cluster is transparent — quorum queues replicate to all
+# 3). Per-node data are HOST bind mounts (survive `docker compose down -v`); fixed hostnames keep the
+# mnesia dir (rabbit@rabbit-N) stable.
+name: dokandar_rabbitmq_cluster
+
+x-rabbit-node: &rabbit-node
+  image: rabbitmq:${RABBITMQ_IMAGE_TAG:-4-management}
+  restart: always
+  environment: &rabbit-env
+    RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:?run setup.sh up - it generates the cookie}
+    RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-dokandar}
+    RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?run setup.sh up}
+  healthcheck:
+    test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+    interval: 10s
+    timeout: 5s
+    retries: 18
+    start_period: 25s
+  networks: [dokandar_rabbitmq_cluster_net]
+
+services:
+  rabbit-1:
+    <<: *rabbit-node
+    container_name: dokandar_rabbit_1
+    hostname: rabbit-1
+    ports:
+      - "${RABBITMQ_AMQP_PORT:-5672}:5672"
+      - "${RABBITMQ_MGMT_PORT:-15672}:15672"
+    volumes:
+      - { type: bind, source: "${DATA_ROOT:-/data}/rabbitmq_cluster/n1", target: /var/lib/rabbitmq, bind: { create_host_path: true } }
+  rabbit-2:
+    <<: *rabbit-node
+    container_name: dokandar_rabbit_2
+    hostname: rabbit-2
+    volumes:
+      - { type: bind, source: "${DATA_ROOT:-/data}/rabbitmq_cluster/n2", target: /var/lib/rabbitmq, bind: { create_host_path: true } }
+  rabbit-3:
+    <<: *rabbit-node
+    container_name: dokandar_rabbit_3
+    hostname: rabbit-3
+    volumes:
+      - { type: bind, source: "${DATA_ROOT:-/data}/rabbitmq_cluster/n3", target: /var/lib/rabbitmq, bind: { create_host_path: true } }
+
+networks:
+  dokandar_rabbitmq_cluster_net:
+    name: dokandar_rabbitmq_cluster_net

@@ -1,0 +1,110 @@
+server:
+  port: ${SERVICE_PORT:8080}
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: catalog
+  jackson:
+    serialization:
+      indent-output: true                       # pretty JSON (indent=2); /metrics, /openapi.json, /docs bypass it
+  mvc:
+    throw-exception-if-no-handler-found: true   # so unmapped paths reach the bare-404 advice
+  web:
+    resources:
+      add-mappings: false                       # no static handler → unmapped paths 404 via the advice
+  jpa:
+    hibernate:
+      ddl-auto: none                            # schema applied by DbBootstrap (idempotent raw DDL)
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:dokandar_catalog_dev}
+    username: ${POSTGRES_USER:postgres}
+    password: ${POSTGRES_PASSWORD:}
+    hikari:
+      maximum-pool-size: 15
+      minimum-idle: 2
+      connection-timeout: 5000
+  data:
+    redis:
+      url: ${REDIS_URL:}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+        # bound the worst-case lock/connection hold in the @Transactional relay (a slow broker
+        # otherwise pins the FOR UPDATE row locks + a Hikari connection for delivery.timeout.ms)
+        max.block.ms: 10000
+        request.timeout.ms: 10000
+        delivery.timeout.ms: 15000
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+springdoc:
+  api-docs:
+    path: /openapi.json
+  swagger-ui:
+    # springdoc serves the swagger-ui assets under /swagger-ui; the public /docs entry page is
+    # a custom controller (DocsController) so the browser <title> is exactly "04-catalog API"
+    # (the webjar index.html hard-codes "Swagger UI"). page-title is not honoured by this version.
+    path: /swagger-ui
+    url: /openapi.json
+    disable-swagger-default-url: true
+
+management:
+  endpoints:
+    web:
+      base-path: /
+      exposure:
+        include: prometheus
+      path-mapping:
+        prometheus: metrics
+  endpoint:
+    prometheus:
+      access: read_only
+
+dokandar:
+  service:
+    name: ${SERVICE_NAME}              # required, NO default — unresolved placeholder fails boot (identity fail-fast)
+    env-version: ${ENV_VERSION:v1.0.0}
+    tenant: ${TENANT:cloud}
+    app-env: ${APP_ENV:dev}
+  grpc:
+    port: ${GRPC_PORT:9090}
+    enabled: ${GRPC_ENABLED:true}
+  internal:
+    service-token: ${INTERNAL_SERVICE_TOKEN:}
+  jwt:
+    public-key-b64: ${JWT_PUBLIC_KEY_B64:}
+    issuer: ${JWT_ISSUER:dokandar-auth}
+  kafka:
+    bootstrap: ${KAFKA_BOOTSTRAP:}
+  mongo:
+    log-uri: ${MONGO_LOG_URI:}
+    log-db: ${MONGO_LOG_DB:mongo_db_dokandar_application_logs}
+  elastic:
+    url: ${ELASTIC_SEARCH_URL:}
+    username: ${ELASTIC_SEARCH_USERNAME:elastic}
+    password: ${ELASTIC_SEARCH_PASSWORD:}
+  apm:
+    server-url: ${APM_SERVER_URL:}
+  media:
+    grpc-addr: ${MEDIA_GRPC_ADDR:}
+  topic:
+    product-changed:  ${KAFKA_TOPIC_PRODUCT_CHANGED:dokandar.product.changed}
+    category-changed: ${KAFKA_TOPIC_CATEGORY_CHANGED:dokandar.category.changed}
+    stock-low:        ${KAFKA_TOPIC_STOCK_LOW:dokandar.stock.low}
+
+logging:
+  level:
+    root: INFO
+    org.springframework: WARN
+    org.hibernate: WARN
+    com.zaxxer.hikari: WARN
+    org.apache.kafka: WARN

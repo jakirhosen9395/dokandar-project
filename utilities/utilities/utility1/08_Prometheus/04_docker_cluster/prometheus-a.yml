@@ -1,0 +1,11 @@
+# DOKANDAR — Prometheus replica A (HA). external_labels.replica distinguishes the two replicas so the
+# Thanos Querier can DEDUPLICATE their identical series. Both replicas scrape the SAME targets.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    replica: a
+scrape_configs:
+  - job_name: prometheus-ha
+    static_configs:
+      - targets: ["prom-a:9090", "prom-b:9090"]

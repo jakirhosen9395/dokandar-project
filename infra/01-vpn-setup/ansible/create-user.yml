@@ -1,0 +1,19 @@
+---
+# Create (or re-create) a single VPN user over AWS SSM and download their .ovpn.
+#   ansible-playbook create-user.yml -e vpn_user=alice
+- name: Create a VPN user and fetch their profile
+  hosts: openvpn
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Require vpn_user
+      ansible.builtin.assert:
+        that:
+          - vpn_user is defined
+          - vpn_user | string | length > 0
+        fail_msg: "Pass -e vpn_user=<name> (alphanumeric, dashes or underscores)."
+
+    - name: Build the client certificate and fetch the profile
+      ansible.builtin.include_role:
+        name: openvpn
+        tasks_from: client.yml

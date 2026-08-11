@@ -1,0 +1,68 @@
+# Writes node metadata to /opt/dokandar/data/cloud/result.json on EVERY worker
+# node (k8s equivalent of each service's data/cloud/collect.sh). Services mount
+# that path read-only at /app/data and serve it via their /data endpoint.
+# hostNetwork: true -> IMDS works regardless of the pod hop-limit setting.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: dokandar-data-collector
+  namespace: kube-system
+  labels:
+    app: dokandar-data-collector
+    environment: prod
+    managed-by: gitlab-ci
+    app.kubernetes.io/part-of: dokandar
+spec:
+  selector:
+    matchLabels:
+      app: dokandar-data-collector
+  template:
+    metadata:
+      labels:
+        app: dokandar-data-collector
+    spec:
+      hostNetwork: true
+      tolerations:
+        - operator: Exists          # run on every node, including the tainted backend pool
+      containers:
+        - name: collector
+          image: curlimages/curl:8.10.1
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              while true; do
+                TOK=$(curl -s -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 300" || true)
+                md() { curl -sf -H "X-aws-ec2-metadata-token: $TOK" "http://169.254.169.254/latest/meta-data/$1" 2>/dev/null || echo unknown; }
+                mkdir -p /host-data/cloud
+                cat > /host-data/cloud/result.json <<EOF
+              {
+                "tenant": "cloud",
+                "collected_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+                "instance_id": "$(md instance-id)",
+                "instance_type": "$(md instance-type)",
+                "availability_zone": "$(md placement/availability-zone)",
+                "region": "$(md placement/region)",
+                "private_ip": "$(md local-ipv4)",
+                "public_ip": "$(md public-ipv4)",
+                "hostname": "$(md hostname)",
+                "ami_id": "$(md ami-id)",
+                "platform": "kubernetes/eks"
+              }
+              EOF
+                sleep 3600
+              done
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { cpu: 50m, memory: 32Mi }
+          securityContext:
+            runAsUser: 0            # hostPath under /opt is root-owned; collector must write there
+            runAsGroup: 0
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: host-data
+              mountPath: /host-data
+      volumes:
+        - name: host-data
+          hostPath:
+            path: /opt/dokandar/data
+            type: DirectoryOrCreate

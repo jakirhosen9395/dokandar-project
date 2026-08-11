@@ -1,0 +1,10 @@
+---
+gitlab_url: "https://gitlab.com"
+runner_executor: "shell"
+runner_description: "dokandar-runner (ansible-managed)"
+# runner_token is a SECRET (glrt-...). Pass at runtime, never commit:
+#   ansible-playbook -i inventory.ini playbook.yml -e "runner_token=glrt-XXXX"
+runner_token: "{{ lookup('env', 'RUNNER_TOKEN') | default('', true) }}"
+
+# How many CI jobs may run simultaneously (build phase: 10 CI jobs in parallel).
+runner_concurrent: 10

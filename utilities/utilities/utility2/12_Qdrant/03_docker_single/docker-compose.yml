@@ -1,0 +1,16 @@
+# Qdrant — Docker Compose single-node. Data is a HOST BIND MOUNT (survives `down -v`).
+# API key from .env (setup.sh writes it). Built-in /dashboard on the HTTP port.
+services:
+  qdrant:
+    image: ${QDRANT_IMAGE:-qdrant/qdrant:v1.18.2}
+    container_name: dokandar_qdrant_docker_single
+    restart: always
+    environment:
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:?set in .env}
+    ports:
+      - "${QDRANT_HTTP_PORT:-6333}:6333"
+      - "${QDRANT_GRPC_PORT:-6334}:6334"
+    volumes:
+      - type: bind
+        source: ${DATA_ROOT:-/data}/qdrant_docker
+        target: /qdrant/storage

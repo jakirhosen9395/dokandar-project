@@ -1,0 +1,71 @@
+---
+# On the infra host: install Docker, clone utilities, bring the data tier up, capture creds.
+- name: Install Docker via the official script (includes compose plugin + containerd)
+  become: true
+  ansible.builtin.shell: |
+    curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+    sh /tmp/get-docker.sh
+  args:
+    creates: /usr/bin/docker
+
+- name: Enable + start docker and containerd
+  become: true
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop: [docker, containerd]
+
+- name: Add the login user to the docker group
+  become: true
+  ansible.builtin.user:
+    name: "{{ ansible_user | default('ubuntu') }}"
+    groups: docker
+    append: true
+
+- name: Install git
+  become: true
+  ansible.builtin.apt:
+    name: git
+    update_cache: true
+    state: present
+
+- name: Clone the utilities repo
+  become: true
+  ansible.builtin.git:
+    repo: "{{ utilities_repo }}"      # pass authed URL via -e for a private repo
+    dest: /opt/dokandar-utilities
+    version: main
+    force: true
+
+- name: Run utilities setup.sh (brings up the data tier — pulls ~16 images, several minutes)
+  become: true
+  ansible.builtin.command: bash setup.sh
+  args:
+    chdir: /opt/dokandar-utilities
+  register: setup_out
+  changed_when: true
+
+- name: Capture credentials (setup.sh creds)
+  become: true
+  ansible.builtin.command: bash setup.sh creds
+  args:
+    chdir: /opt/dokandar-utilities
+  register: creds_out
+  changed_when: false
+
+- name: Ensure the local .creds directory exists
+  ansible.builtin.file:
+    path: "{{ playbook_dir }}/.creds"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+  become: false
+
+- name: Fetch creds to the control node for env rendering
+  ansible.builtin.copy:
+    content: "{{ creds_out.stdout }}"
+    dest: "{{ playbook_dir }}/.creds/infra-creds.txt"
+    mode: "0600"
+  delegate_to: localhost
+  become: false

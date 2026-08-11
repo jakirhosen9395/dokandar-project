@@ -1,0 +1,191 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dokandar-support
+  namespace: support
+  labels:
+    app: dokandar-support
+    component: support
+    environment: prod
+    managed-by: gitlab-ci
+    app.kubernetes.io/part-of: dokandar
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dokandar-support
+  namespace: support
+  labels:
+    app: dokandar-support
+    component: support
+    environment: prod
+    managed-by: gitlab-ci
+    app.kubernetes.io/part-of: dokandar
+  annotations:
+    # Reference convention: stakater Reloader restarts pods on config/secret change
+    configmap.reloader.stakater.com/reload: dokandar-support-config
+    secret.reloader.stakater.com/reload: dokandar-support-secret
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: dokandar-support
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: dokandar-support
+        component: support
+        environment: prod
+        managed-by: gitlab-ci
+        app.kubernetes.io/part-of: dokandar
+        version: v1              # release marker (reference convention); CI may bump
+    spec:
+      serviceAccountName: dokandar-support
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      nodeSelector:
+        dokandar.io/node-pool: workers
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - dokandar-support
+                topologyKey: "kubernetes.io/hostname"
+      # EKS nodes normally pull from ECR via the node instance role; keep this
+      # secret reference only if pulling from a registry outside the account.
+      imagePullSecrets:
+        - name: dokandar-registry-cred   # TODO: remove if using node IAM role for ECR
+      containers:
+        - name: dokandar-support
+          # CI/CD injects the real image, e.g.
+          #   <ACCOUNT>.dkr.ecr.ap-southeast-1.amazonaws.com/dokandar/00-support:<sha>
+          image: 158909019231.dkr.ecr.ap-southeast-1.amazonaws.com/dokandar/00-support:12
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: dokandar-support-config
+            - secretRef:
+                name: dokandar-support-secret
+          resources:
+            requests:
+              cpu: "75m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "384Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+              scheme: HTTP
+            periodSeconds: 5
+            failureThreshold: 12
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8000
+              scheme: HTTP
+              httpHeaders:
+                - name: Accept
+                  value: application/json
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+              scheme: HTTP
+              httpHeaders:
+                - name: Accept
+                  value: application/json
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                # let the ALB/kube-proxy drain in-flight connections
+                command: ["/bin/sh", "-c", "sleep 5"]
+          volumeMounts:
+            - name: dokandar-data
+              mountPath: /app/data
+              readOnly: true
+      volumes:
+        - name: dokandar-data
+          hostPath:
+            path: /opt/dokandar/data
+            type: DirectoryOrCreate
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: dokandar-support
+  namespace: support
+  labels:
+    app: dokandar-support
+    component: support
+    environment: prod
+    managed-by: gitlab-ci
+    app.kubernetes.io/part-of: dokandar
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: dokandar-support
+  minReplicas: 2
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 120
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: dokandar-support
+  namespace: support
+  labels:
+    app: dokandar-support
+    component: support
+    environment: prod
+    managed-by: gitlab-ci
+    app.kubernetes.io/part-of: dokandar
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: dokandar-support

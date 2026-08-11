@@ -1,0 +1,137 @@
+server:
+  port: ${SERVICE_PORT:8080}                    # in-container 8080 (docker -e overrides the env's 10013); LB maps ext 10013
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: order
+  jackson:
+    serialization:
+      indent-output: true                       # pretty JSON (indent=2); /metrics, /openapi.json, /docs bypass it
+  mvc:
+    throw-exception-if-no-handler-found: true   # so unmapped paths reach the bare-404 advice
+  web:
+    resources:
+      add-mappings: false                       # no static handler -> unmapped paths 404 via the advice
+  jpa:
+    hibernate:
+      ddl-auto: none                            # schema owned by Flyway (DbBootstrap runs migrate before the EMF)
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+  flyway:
+    enabled: false                              # run programmatically inside DbBootstrap AFTER ensure-db (ordering)
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:dokandar_order_dev}
+    username: ${POSTGRES_USER:postgres}
+    password: ${POSTGRES_PASSWORD:}
+    hikari:
+      maximum-pool-size: 15
+      minimum-idle: 2
+      connection-timeout: 5000
+  data:
+    redis:
+      url: ${REDIS_URL:}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+        # bound the worst-case lock/connection hold in the @Transactional relay (a slow broker
+        # otherwise pins the FOR UPDATE row locks + a Hikari connection for delivery.timeout.ms)
+        max.block.ms: 10000
+        request.timeout.ms: 10000
+        delivery.timeout.ms: 15000
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP:order}
+      enable-auto-commit: false                 # commit offset only AFTER the handler's DB tx (commit-after-handle)
+      auto-offset-reset: latest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    listener:
+      ack-mode: manual                          # the consumer Acknowledges explicitly after the DB tx commits
+
+springdoc:
+  api-docs:
+    path: /openapi.json
+  swagger-ui:
+    path: /docs
+    url: /openapi.json
+    disable-swagger-default-url: true
+    page-title: "13-order API"               # browser <title> (springdoc >= 2.6 / equivalent)
+    persist-authorization: true              # keep the Authorize token across reloads
+
+management:
+  endpoints:
+    web:
+      base-path: /
+      exposure:
+        include: prometheus
+      path-mapping:
+        prometheus: metrics
+  endpoint:
+    prometheus:
+      access: read_only
+
+dokandar:
+  service:
+    name: ${SERVICE_NAME}              # required, NO default — unresolved placeholder fails boot (identity fail-fast)
+    env-version: ${ENV_VERSION:v1.0.0}
+    tenant: ${TENANT:cloud}
+    app-env: ${APP_ENV:dev}
+  grpc:
+    port: ${GRPC_PORT:9090}
+    enabled: ${GRPC_ENABLED:true}
+  internal:
+    service-token: ${INTERNAL_SERVICE_TOKEN:}
+  jwt:
+    public-key-b64: ${JWT_PUBLIC_KEY_B64:}
+    issuer: ${JWT_ISSUER:dokandar-auth}
+  kafka:
+    bootstrap: ${KAFKA_BOOTSTRAP:}
+  mongo:
+    log-uri: ${MONGO_LOG_URI:}
+    log-db: ${MONGO_LOG_DB:mongo_db_dokandar_application_logs}
+  elastic:
+    url: ${ELASTIC_SEARCH_URL:}
+    username: ${ELASTIC_SEARCH_USERNAME:elastic}
+    password: ${ELASTIC_SEARCH_PASSWORD:}
+  apm:
+    server-url: ${APM_SERVER_URL:}
+  # -- Temporal (saga state; reported on /health, NEVER a /ready gate) --------
+  temporal:
+    # TEMPORAL_TARGET is canonical; TEMPORAL_HOST kept for back-compat; the default is a SAFE
+    # placeholder (never the real infra IP) so a misconfigured deploy fails fast, not silently
+    # to a specific host. init-env.sh renders both from creds block 16_Temporal.
+    target: ${TEMPORAL_TARGET:${TEMPORAL_HOST:localhost:7233}}
+    namespace: ${TEMPORAL_NAMESPACE:default}
+    task-queue: ${TEMPORAL_TASK_QUEUE:checkout-saga}
+  # -- East-west peers (gRPC clients + internal REST to payment; diag on /health) --
+  peer:
+    catalog-grpc-addr: ${CATALOG_GRPC_ADDR:}
+    coupon-grpc-addr:  ${COUPON_GRPC_ADDR:}
+    wallet-grpc-addr:  ${WALLET_GRPC_ADDR:}
+    payment-rest-url:  ${PAYMENT_REST_URL:}
+  # -- Kafka topics (literal per service; TENANT must NOT change these) -------
+  topic:
+    order-placed:         ${KAFKA_TOPIC_ORDER_PLACED:dokandar.order.placed}
+    order-confirmed:      ${KAFKA_TOPIC_ORDER_CONFIRMED:dokandar.order.confirmed}
+    order-status-changed: ${KAFKA_TOPIC_ORDER_STATUS_CHANGED:dokandar.order.status_changed}
+    order-delivered:      ${KAFKA_TOPIC_ORDER_DELIVERED:dokandar.order.delivered}
+    order-refunded:       ${KAFKA_TOPIC_ORDER_REFUNDED:dokandar.order.refunded}
+    order-cancelled:      ${KAFKA_TOPIC_ORDER_CANCELLED:dokandar.order.cancelled}
+    payment-settled:      ${KAFKA_TOPIC_PAYMENT_SETTLED:dokandar.payment.settled}
+
+logging:
+  level:
+    root: INFO
+    org.springframework: WARN
+    org.hibernate: WARN
+    com.zaxxer.hikari: WARN
+    org.apache.kafka: WARN
+    io.temporal: WARN

@@ -1,0 +1,32 @@
+# =========================================================================
+# Terraform
+# =========================================================================
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+tfplan
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# =========================================================================
+# Secrets — NEVER commit (SSH private keys, TLS keys, VPN client profiles)
+# =========================================================================
+*.pem
+*.key
+*.ovpn
+**/vpn-clients/*.ovpn
+
+# =========================================================================
+# Generated files, local environment, and logs
+# =========================================================================
+**/inventory.ini
+.env
+.env.*
+*.log
+CLAUDE.md

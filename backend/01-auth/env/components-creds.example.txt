@@ -1,0 +1,72 @@
+# env/components-creds.example.txt — infra-creds template for 01-auth (### NN_Service format).
+#
+# REAL secrets go in env/components-creds.txt (GITIGNORED) — never in this committed
+# .example file. Workflow:
+#   cp env/components-creds.example.txt env/components-creds.txt
+#   $EDITOR env/components-creds.txt        # paste your REAL infra creds (the full ### dump)
+#   chmod 600 env/components-creds.txt
+#   ./env/init-env.sh .env.dev             # renders env/.env.dev (fresh RS256 JWT keypair)
+#
+# init-env.sh reads env/components-creds.txt (gitignored). Paste your FULL infra status
+# dump (all ### blocks); 01-auth uses only these:
+#   01_PostgreSQL 02_MongoDB 04_Redis 05_Kafka 06_RabbitMQ 07_Elastic_APM 10_RustFS.
+# Other blocks are ignored — including 03_Elasticsearch (:9201), which is the
+# search/review business ES used ONLY by 05-search + 08-review.
+#
+# auth is the SOLE holder of the RS256 private key: init-env.sh GENERATES a fresh
+# keypair + INTERNAL_SERVICE_TOKEN on every run (no JWT keys in this file, and NO
+# ### Auth_Identity block — auth mints what every other service consumes).
+
+### 01_PostgreSQL
+   endpoint       postgresql://<user>:<password>@<host>:5432/postgres
+   host:port      <host>:5432
+   user           <user>
+   password       <password>
+
+### 02_MongoDB
+   endpoint       mongodb://<user>:<password>@<host>:27017/?authSource=admin
+   host:port      <host>:27017
+   user           <user>
+   password       <password>
+
+# --- 03 (:9201) is the SEARCH/REVIEW business ES — used ONLY by 05-search + 08-review.
+#     01-auth does NOT read it; the auth log-sink ES is block 07's `elasticsearch` (:9200). ---
+### 03_Elasticsearch
+   endpoint       http://<user>:<password>@<host>:9201
+   host:port      <host>:9201
+   user           <user>
+   password       <password>
+
+### 04_Redis
+   endpoint       redis://default:<password>@<host>:6379/0
+   host:port      <host>:6379
+   user           default
+   password       <password>
+
+### 05_Kafka
+   bootstrap      <host>:9092
+   ui             http://<host>:8080
+   auth           none (PLAINTEXT)
+
+### 06_RabbitMQ
+   amqp-url       amqp://<user>:<password>@<host>:5672/
+   host:port      <host>:5672
+   user           <user>
+   password       <password>
+   ui             http://<host>:15672
+
+# --- 07's `elasticsearch` line (:9200) is the APM-stack ES = the application log sink for
+#     01-auth (and every non-search/review service); `apm-ingest` (:8200) is APM traces. ---
+### 07_Elastic_APM
+   elasticsearch  http://elastic:<apm-es-password>@<host>:9200
+   apm-ingest     http://<host>:8200  (Bearer token)
+   apm-token      <apm-bearer-token>
+   kibana-ui      http://<host>:5601  (login: elastic)
+   elastic-pass   <apm-es-password>
+   kibana_system  <kibana-system-password>
+
+### 10_RustFS
+   s3-endpoint    http://<host>:9002
+   console-ui     http://<host>:9001
+   access-key     <access-key>
+   secret-key     <secret-key>

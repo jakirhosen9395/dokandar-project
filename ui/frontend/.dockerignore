@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+.gitignore
+*.log
+npm-debug.log*
+.env
+.env.local
+.env.*.local
+env/.env.dev
+env/.env.prod
+.DS_Store
+Dockerfile
+.dockerignore
+# README.md / COMMAND.md / docs are intentionally INCLUDED — the DEVOPS doc viewer renders them at runtime.

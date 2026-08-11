@@ -1,0 +1,35 @@
+# RustFS — Docker Compose single-node. S3-compatible object storage (replaces MinIO; CLAUDE.md §2 exit path).
+# Ported from gitlab.com/dokandar/utilities/components (branch components, rustfs/), pinned to
+# ${RUSTFS_IMAGE} (ref used 1.0.0-beta.4; this defaults to beta.8 — bump deliberately, it's a beta train).
+#   S3 API     : ${RUSTFS_API_PORT:-9000}
+#   Console UI : ${RUSTFS_CONSOLE_PORT:-9001}
+# Objects + logs are HOST bind mounts (survive `down -v`). Container runs as uid 10001.
+services:
+  rustfs:
+    image: ${RUSTFS_IMAGE:-rustfs/rustfs:1.0.0-beta.8}
+    container_name: dokandar_rustfs_docker_single
+    hostname: rustfs
+    restart: always
+    environment:
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:?set in .env}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:?set in .env}
+      RUSTFS_CORS_ALLOWED_ORIGINS: ${RUSTFS_CORS_ALLOWED_ORIGINS:-*}
+      RUSTFS_CONSOLE_CORS_ALLOWED_ORIGINS: ${RUSTFS_CONSOLE_CORS_ALLOWED_ORIGINS:-*}
+      RUSTFS_OBS_LOGGER_LEVEL: info
+      RUSTFS_OBS_LOG_DIRECTORY: /logs
+    ports:
+      - "${BIND_HOST:-0.0.0.0}:${RUSTFS_API_PORT:-9000}:9000"
+      - "${BIND_HOST:-0.0.0.0}:${RUSTFS_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - type: bind
+        source: ${DATA_ROOT:-/data}/rustfs_docker/data
+        target: /data
+      - type: bind
+        source: ${DATA_ROOT:-/data}/rustfs_docker/logs
+        target: /logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s

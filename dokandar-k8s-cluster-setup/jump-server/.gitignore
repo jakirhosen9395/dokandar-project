@@ -1,0 +1,2 @@
+# Real secret values never leave the jump server / never get committed.
+secrets/*/*.env

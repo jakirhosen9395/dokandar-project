@@ -1,0 +1,9 @@
+# DOKANDAR — Prometheus scrape config (docker single-node). Prometheus scrapes itself so the test has an
+# `up` series. Add more scrape_configs to monitor real targets.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

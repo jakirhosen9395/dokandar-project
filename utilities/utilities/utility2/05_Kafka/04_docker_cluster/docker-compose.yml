@@ -1,0 +1,68 @@
+# DOKANDAR utility — Apache Kafka 4.3 · Docker Compose HA cluster (KRaft: 3 combined broker+controller).
+# 3 nodes, static controller quorum [1,2,3]. PLAINTEXT (dev). Uses HOST networking so each node binds a
+# distinct host port (data 9092/9094/9096, controller 9093/9095/9097) and advertises the host IP — so the
+# cluster is reachable locally AND cross-host without hairpin. Per-node data are HOST bind mounts
+# (survive `docker compose down -v`). Internal topics are RF 3.
+name: dokandar_kafka_cluster
+
+x-kafka-common-env: &kafka-common-env
+  KAFKA_PROCESS_ROLES: broker,controller
+  CLUSTER_ID: ${KAFKA_CLUSTER_ID:?run setup.sh up - it generates the cluster id}
+  KAFKA_CONTROLLER_QUORUM_VOTERS: 1@${KAFKA_ADVERTISED_HOST:?set KAFKA_ADVERTISED_HOST}:9093,2@${KAFKA_ADVERTISED_HOST}:9095,3@${KAFKA_ADVERTISED_HOST}:9097
+  KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+  KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+  KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+  KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+  KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+  KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+  KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
+
+x-kafka-node: &kafka-node
+  image: apache/kafka:${KAFKA_VERSION:-4.3.0}
+  restart: always
+  network_mode: host
+
+services:
+  kafka-1:
+    <<: *kafka-node
+    container_name: dokandar_kafka_c1
+    environment:
+      <<: *kafka-common-env
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://${KAFKA_ADVERTISED_HOST}:9092
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes: [{ type: bind, source: "${DATA_ROOT:-/data}/kafka_cluster/n1", target: /var/lib/kafka/data, bind: { create_host_path: true } }]
+  kafka-2:
+    <<: *kafka-node
+    container_name: dokandar_kafka_c2
+    environment:
+      <<: *kafka-common-env
+      KAFKA_NODE_ID: 2
+      KAFKA_LISTENERS: PLAINTEXT://:9094,CONTROLLER://:9095
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://${KAFKA_ADVERTISED_HOST}:9094
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes: [{ type: bind, source: "${DATA_ROOT:-/data}/kafka_cluster/n2", target: /var/lib/kafka/data, bind: { create_host_path: true } }]
+  kafka-3:
+    <<: *kafka-node
+    container_name: dokandar_kafka_c3
+    environment:
+      <<: *kafka-common-env
+      KAFKA_NODE_ID: 3
+      KAFKA_LISTENERS: PLAINTEXT://:9096,CONTROLLER://:9097
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://${KAFKA_ADVERTISED_HOST}:9096
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes: [{ type: bind, source: "${DATA_ROOT:-/data}/kafka_cluster/n3", target: /var/lib/kafka/data, bind: { create_host_path: true } }]
+
+  # Provectus kafka-ui (the ref's browser UI) — host-networked like the brokers; points at all 3 advertised
+  # bootstrap endpoints so it sees the whole cluster.
+  kafka-ui:
+    image: ${KAFKA_UI_IMAGE:-provectuslabs/kafka-ui:v0.7.2}
+    container_name: dokandar_kafka_ui
+    restart: always
+    network_mode: host
+    environment:
+      KAFKA_CLUSTERS_0_NAME: dokandar
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: ${KAFKA_ADVERTISED_HOST}:9092,${KAFKA_ADVERTISED_HOST}:9094,${KAFKA_ADVERTISED_HOST}:9096
+      DYNAMIC_CONFIG_ENABLED: "true"
+      SERVER_PORT: ${KAFKA_UI_PORT:-8080}

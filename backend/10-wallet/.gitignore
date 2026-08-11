@@ -1,0 +1,12 @@
+*.python-backup
+env/.env.dev
+env/.env.stage
+env/.env.prod
+env/components-creds.txt
+env/env.txt
+data/local/result.json
+data/cloud/result.json
+out/
+*.so
+DI
+env/.env.*

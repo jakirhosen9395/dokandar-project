@@ -1,0 +1,15 @@
+# ArgoCD helm values — DOKANDAR EKS (private-only cluster)
+# UI = NodePort 30080 on the worker nodes: http://<node-private-ip>:30080 (VPN required).
+dex:
+  enabled: false
+notifications:
+  enabled: false
+
+configs:
+  params:
+    server.insecure: true
+
+server:
+  service:
+    type: NodePort
+    nodePortHttp: 30080

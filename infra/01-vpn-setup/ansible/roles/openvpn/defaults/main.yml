@@ -1,0 +1,19 @@
+---
+# OpenVPN settings. Override in group_vars/ or inventory if needed.
+openvpn_port: 1194
+openvpn_proto: udp
+openvpn_dev: tun
+openvpn_server_network: "10.8.0.0"
+openvpn_server_netmask: "255.255.255.0"
+openvpn_vpn_cidr: "10.8.0.0/24"
+openvpn_dns_1: "8.8.8.8"
+openvpn_dns_2: "8.8.4.4"
+openvpn_client_name: "admin_user"
+
+# Split-tunnel route pushed to clients (the VPC CIDR).
+openvpn_vpc_route_network: "10.0.0.0"
+openvpn_vpc_route_netmask: "255.255.0.0"
+
+openvpn_easyrsa_dir: "/etc/openvpn/easy-rsa"
+openvpn_pki_dir: "/etc/openvpn/easy-rsa/pki"
+openvpn_server_dir: "/etc/openvpn/server"

@@ -1,0 +1,13 @@
+---
+- name: reload sysctl
+  ansible.builtin.command: sysctl --system
+  changed_when: false
+
+- name: save iptables
+  ansible.builtin.command: netfilter-persistent save
+  changed_when: false
+
+- name: restart openvpn
+  ansible.builtin.systemd:
+    name: "openvpn-server@server"
+    state: restarted

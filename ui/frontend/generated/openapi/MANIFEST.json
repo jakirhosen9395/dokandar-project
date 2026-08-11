@@ -1,0 +1,135 @@
+{
+  "00-support": {
+    "version": "0.1.0",
+    "title": "DOKANDAR support (dev/stage hub)",
+    "paths": 9,
+    "source": ":10099/openapi.json",
+    "fetchedAt": "2026-06-20T18:02:24.266Z"
+  },
+  "01-auth": {
+    "version": "01-auth",
+    "title": "DOKANDAR Auth Service",
+    "paths": 18,
+    "source": ":10001/openapi.json",
+    "fetchedAt": "2026-06-20T18:02:26.021Z"
+  },
+  "02-profile": {
+    "version": "02-profile",
+    "title": "DOKANDAR Profile Service",
+    "paths": 14,
+    "source": ":10002/openapi.json",
+    "fetchedAt": "2026-06-20T18:02:27.654Z"
+  },
+  "03-seller": {
+    "version": "03-seller",
+    "title": "DOKANDAR Seller Service",
+    "paths": 22,
+    "source": ":10003/openapi.json",
+    "fetchedAt": "2026-06-20T18:02:29.309Z"
+  },
+  "04-catalog": {
+    "version": "04-catalog",
+    "title": "DOKANDAR Catalog Service",
+    "paths": 12,
+    "source": ":10004/openapi.json",
+    "fetchedAt": "2026-06-20T18:02:31.279Z"
+  },
+  "05-search": {
+    "version": "05-search",
+    "title": "DOKANDAR Search Service",
+    "paths": 10,
+    "source": ":10005/openapi.json",
+    "fetchedAt": "2026-06-20T18:02:32.774Z"
+  },
+  "06-cart": {
+    "version": "06-cart",
+    "title": "DOKANDAR Cart Service",
+    "paths": 13,
+    "source": ":10006/openapi.json",
+    "fetchedAt": "2026-06-20T18:02:34.288Z"
+  },
+  "07-coupon": {
+    "version": "07-coupon",
+    "title": "DOKANDAR Coupon Service",
+    "paths": 11,
+    "source": ":10007/openapi.json",
+    "fetchedAt": "2026-06-20T18:02:35.671Z"
+  },
+  "08-review": {
+    "version": "08-review",
+    "title": "DOKANDAR Review Service",
+    "paths": 13,
+    "source": ":10008/openapi.json",
+    "fetchedAt": "2026-06-20T18:02:37.152Z"
+  },
+  "09-payment": {
+    "version": "09-payment",
+    "title": "DOKANDAR Payment Service",
+    "paths": 11,
+    "source": ":10009/openapi.json",
+    "fetchedAt": "2026-06-20T18:02:38.462Z"
+  },
+  "10-wallet": {
+    "version": "10-wallet",
+    "title": "DOKANDAR Wallet Service",
+    "paths": 13,
+    "source": ":10010/openapi.json",
+    "fetchedAt": "2026-06-20T18:02:39.851Z"
+  },
+  "11-reporting": {
+    "version": "11-reporting",
+    "title": "DOKANDAR Reporting Service",
+    "paths": 10,
+    "source": ":10011/openapi.json",
+    "fetchedAt": "2026-06-20T18:02:41.123Z"
+  },
+  "12-media": {
+    "version": "12-media",
+    "title": "12-media — DOKANDAR object-storage gateway",
+    "paths": 12,
+    "source": ":10012/openapi.json",
+    "fetchedAt": "2026-06-20T18:02:42.592Z"
+  },
+  "13-order": {
+    "version": "13-order",
+    "title": "DOKANDAR Order Service",
+    "paths": 10,
+    "source": ":10013/openapi.json",
+    "fetchedAt": "2026-06-20T18:02:44.153Z"
+  },
+  "14-notification": {
+    "version": "14-notification",
+    "title": "DOKANDAR Notification Service",
+    "paths": 7,
+    "source": ":10014/openapi.json",
+    "fetchedAt": "2026-06-20T18:02:45.808Z"
+  },
+  "15-api-gateway": {
+    "version": "15-api-gateway",
+    "title": "DOKANDAR API Gateway",
+    "paths": 5,
+    "source": ":10015/openapi.json",
+    "fetchedAt": "2026-06-20T18:02:47.145Z"
+  },
+  "16-recommendation": {
+    "version": "16-recommendation",
+    "title": "DOKANDAR Recommendation Service",
+    "paths": 7,
+    "source": ":10016/openapi.json",
+    "fetchedAt": "2026-06-20T18:02:48.889Z"
+  },
+  "17-shipping": {
+    "version": "17-shipping",
+    "title": "DOKANDAR Shipping Service",
+    "paths": 6,
+    "source": ":10017/openapi.json",
+    "fetchedAt": "2026-06-20T18:02:50.525Z"
+  },
+  "18-risk-trust": {
+    "version": "18-risk-trust",
+    "title": "DOKANDAR Risk & Trust Service",
+    "paths": 8,
+    "source": ":10018/openapi.json",
+    "fetchedAt": "2026-06-20T18:02:51.958Z"
+  }
+}

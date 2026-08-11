@@ -1,0 +1,58 @@
+# DOKANDAR CI/CD (GitOps) — build image → push to Amazon ECR → bump the image tag
+# in the k8s manifest repo (infra/dokandar-k8s-cluster-setup). The cluster deploys
+# from that repo (ArgoCD or `kubectl apply` from the jump server) — no SSM deploy here.
+# Runs on the self-hosted GitLab runner (IAM role: ECR push — no AWS keys in CI vars).
+# Requires ONE group CI/CD variable: MANIFEST_PUSH_TOKEN (masked) with
+# write_repository access to infra/dokandar-k8s-cluster-setup.
+stages:
+  - build
+  - push
+  - update_manifest
+
+variables:
+  AWS_REGION: "ap-southeast-1"
+  SERVICE: "10-wallet"                 # ECR repository: dokandar/10-wallet
+  TAG: "${CI_PIPELINE_IID}"          # monotonic release tag
+  MANIFEST_REPO: "gitlab.com/learningdevopstools/infra/dokandar-k8s-cluster-setup.git"
+  MANIFEST_BRANCH: "main"
+  DEPLOYMENT_FILE: "manifest-files/backend/10-wallet/dokandar-wallet-deployment.yaml"
+
+default:
+  tags:
+    - dokandar-runner
+  before_script:
+    - export ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+    - export REGISTRY="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+    - export IMAGE="${REGISTRY}/dokandar/${SERVICE}"
+    - export IMAGE_NAME="${IMAGE}:${TAG}"
+
+build:
+  stage: build
+  script:
+    - docker build -t "${IMAGE_NAME}" -t "${IMAGE}:latest" .
+
+push:
+  stage: push
+  script:
+    - aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$REGISTRY"
+    - docker push "${IMAGE_NAME}"
+    - docker push "${IMAGE}:latest"
+    - docker rmi "${IMAGE_NAME}" || true
+
+update_manifest:
+  stage: update_manifest
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "source-code" || $CI_COMMIT_BRANCH == "main"'
+  script:
+    - rm -rf manifest-repo
+    - git clone --depth 1 --branch "${MANIFEST_BRANCH}" "https://oauth2:${MANIFEST_PUSH_TOKEN}@${MANIFEST_REPO}" manifest-repo
+    - cd manifest-repo
+    - git config user.email "dokandar-ci@learningdevopstools.local"
+    - git config user.name "dokandar-ci"
+    # anchored: rewrites ONLY the real image line, never comments/imagePullPolicy
+    - 'sed -i "s|^\( *\)image:.*|\1image: ${IMAGE_NAME}|" "${DEPLOYMENT_FILE}"'
+    - grep -n "image:" "${DEPLOYMENT_FILE}"
+    - git add "${DEPLOYMENT_FILE}"
+    - 'git commit -m "chore(10-wallet): image ${TAG} (${CI_COMMIT_SHORT_SHA})" || { echo "no change"; exit 0; }'
+    # retry once on race with another service's pipeline
+    - git push origin "${MANIFEST_BRANCH}" || { git pull --rebase origin "${MANIFEST_BRANCH}" && git push origin "${MANIFEST_BRANCH}"; }

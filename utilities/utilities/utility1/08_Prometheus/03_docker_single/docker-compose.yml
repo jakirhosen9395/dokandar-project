@@ -1,0 +1,32 @@
+# DOKANDAR utility — Prometheus 3.12 · Docker Compose single-node (built-in web UI + HTTP API :9090).
+# No built-in auth (firewall/SG-protected). Data is a HOST BIND MOUNT (${DATA_ROOT}/prometheus_docker) →
+# survives `docker compose down -v`. The scrape config is the committed ./prometheus.yml (not a secret).
+name: dokandar_prometheus_single
+services:
+  prometheus:
+    image: prom/prometheus:v${PROM_VERSION:-3.12.0}
+    container_name: dokandar_prometheus_docker_single
+    restart: always
+    user: "65534:65534"   # nobody — matches the bind-mounted data dir ownership
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}
+      - --web.listen-address=0.0.0.0:9090
+      - --web.enable-lifecycle
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - type: bind
+        source: ./prometheus.yml
+        target: /etc/prometheus/prometheus.yml
+        read_only: true
+      - type: bind
+        source: ${DATA_ROOT:-/data}/prometheus_docker
+        target: /prometheus
+        bind:
+          create_host_path: true
+    networks: [dokandar_prometheus_net]
+networks:
+  dokandar_prometheus_net:
+    name: dokandar_prometheus_net

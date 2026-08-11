@@ -1,0 +1,205 @@
+./frontend/FRONTEND_ARCHITECTURE.md:133:- **Realtime →** notification inbox via WS/NATS through gateway **[GAP-3]**; fallback polling.
+./frontend/FRONTEND_ARCHITECTURE.md:284:**GAP register (Phase 3):** GAP-1 seller storefront unreachable (gateway `/api/v1/seller/*` ≠ service `/api/v1/shop/*`,
+./frontend/FRONTEND_ARCHITECTURE.md:285:404 even authed — **backend fix needed**); GAP-2 search filters limited to `category_id`; GAP-3 reviews+recs Bearer-gated;
+./frontend/FRONTEND_ARCHITECTURE.md:286:GAP-4 guest cart 401 (cart requires login); GAP-5 product images absent from public catalog/search (placeholder);
+./frontend/FRONTEND_ARCHITECTURE.md:287:GAP-6 product detail lacks `shop_id` for cart (carried via `?shop=`). **Checkout** = foundation only; payment disabled + "coming soon".
+./frontend/FRONTEND_ARCHITECTURE.md:302:Notifications: **polling** (30s) — realtime is NATS, not REST (GAP-9).
+./frontend/FRONTEND_ARCHITECTURE.md:304:**GAP register (Phase 4):** GAP-7 order list lacks backend filter/page params (client-side filter) · GAP-8 shipment
+./frontend/FRONTEND_ARCHITECTURE.md:305:tracking (17-shipping) absent from the customer gateway set · GAP-9 notifications realtime is NATS (polling instead) ·
+./frontend/FRONTEND_ARCHITECTURE.md:306:GAP-10 review-list "mine" filter unverified · GAP-11 `profile/me` 404 until the Kafka profile projection lands for new
+./frontend/FRONTEND_ARCHITECTURE.md:320:boundary (honest empty/blocked states, no mocks)** — seller orders (GAP-13), media library (GAP-15 internal MinIO host /
+./frontend/FRONTEND_ARCHITECTURE.md:321:GAP-16 list 404), analytics (reporting not exposed), shop setup/storefront (GAP-1), product publish (`list-in-shop` needs a
+./frontend/FRONTEND_ARCHITECTURE.md:322:shop, GAP-1), coupon create (`scope=shop` needs `shopId`, GAP-1; activation is admin `approve`, GAP-14).
+./frontend/FRONTEND_ARCHITECTURE.md:324:**GAP register (Phase 5):** GAP-12 catalog list not seller-scoped · GAP-13 no seller order list · GAP-14 coupon activation
+./frontend/FRONTEND_ARCHITECTURE.md:325:admin-gated · GAP-15 media presign → internal MinIO host · GAP-16 media list 404 · GAP-17 catalog write schemas undocumented
+./frontend/FRONTEND_ARCHITECTURE.md:326:in OpenAPI (read from `backend/04-catalog`) · GAP-18 no inventory-history API · GAP-19 shopkeeper not self-serviceable at
+./frontend/FRONTEND_ARCHITECTURE.md:331:(privileged token); **zero regression**; 287 MB, healthy, non-root. Authed-shopkeeper render limited by GAP-19.
+./frontend/FRONTEND_ARCHITECTURE.md:341:18-service catalog + observability model). **Blocked (honest states):** sellers (GAP-1), per-order monitoring (GAP-13),
+./frontend/FRONTEND_ARCHITECTURE.md:342:admin notifications (GAP-21). **No charting lib** — orders chart is pure CSS bars.
+./frontend/FRONTEND_ARCHITECTURE.md:344:**GAP register (Phase 6):** GAP-20 no user-list API (lookup-by-id only) · GAP-21 no platform-wide notification API ·
+./frontend/FRONTEND_ARCHITECTURE.md:345:GAP-22 observability tools (Kibana/APM/Grafana) are internal-only — deep-linking needs a BFF reverse-proxy; internal URLs
+./frontend/FRONTEND_ARCHITECTURE.md:392:- **GAP-2** search filters → search page over-fetches (size 100, the backend cap) and a client facet sidebar filters
+./frontend/FRONTEND_ARCHITECTURE.md:395:- **GAP-4** guest cart → client-side cart (`stores/guest-cart.ts`, Zustand+localStorage; the in-memory rule was for tokens).
+./frontend/FRONTEND_ARCHITECTURE.md:397:- **GAP-8** shipment tracking → 17-shipping is customer-reachable by sub-order id (verified 404-not-gated). Order detail now
+./frontend/FRONTEND_ARCHITECTURE.md:401:- **GAP-5** product images → `components/product-image.tsx`: deterministic branded placeholder (colour from id + initial)
+./frontend/FRONTEND_ARCHITECTURE.md:402:  across cards, detail, cart, wishlist — the UI never looks broken. Cards also carry `?shop=` (helps GAP-6).
+./frontend/FRONTEND_ARCHITECTURE.md:403:- **GAP-1** seller → seller dashboard with **live connection diagnostics** (catalog/coupon reachable, shop/media not),
+./frontend/FRONTEND_ARCHITECTURE.md:405:- **GAP-9** notifications → polling + **manual Refresh + last-synced timestamp + notification-preferences editor**
+./frontend/FRONTEND_ARCHITECTURE.md:407:- **GAP-13** admin orders → **manual order lookup-by-id** form (the only reachable order read) beside the aggregate chart.
+./frontend/FRONTEND_ARCHITECTURE.md:408:- **GAP-15/16** media → **local upload-queue** (object-URL previews, draft management, explicitly blocked publish — nothing
+./frontend/FRONTEND_ARCHITECTURE.md:412:**Not frontend-fixable (require backend/gateway changes the directive forbids):** GAP-1 (gateway `seller/*`≠service `shop/*`;
+./frontend/FRONTEND_ARCHITECTURE.md:413:can't bypass the gateway), GAP-3 (backend gates reviews/recs), GAP-5 (no media refs in product payload), GAP-6 (`?shop`
+./frontend/FRONTEND_ARCHITECTURE.md:414:covers the real flow; lookup-by-product can't pick the right shop), GAP-10 (`/review/reviews` has no params + can't prove
+./frontend/FRONTEND_ARCHITECTURE.md:415:caller-scoping — left honest), GAP-13 (no order-list API), GAP-15/16 (media list 404 + presign→internal MinIO; a perfect
+./frontend/FRONTEND_ARCHITECTURE.md:416:upload proxy still can't be read back or attached → no user value), GAP-17/18/19/20/21/22. These stay as documented blocked
+./frontend/FRONTEND_ARCHITECTURE.md:446:| GAP-1 | Public seller-storefront read route (e.g. `GET /api/v1/seller/shops/{handle}` public, or via search) unconfirmed | `/store/[handle]` (seller storefront) | confirm/add public shop-by-handle endpoint at gateway | **High** | 03-seller team |
+./frontend/FRONTEND_ARCHITECTURE.md:447:| GAP-2 | Seller order **status-transition** endpoint (`PATCH /api/v1/order/orders/{id}/status`) not found in spec scope | Seller → Orders (fulfill/ship/cancel) | confirm/expose shopkeeper transition endpoint | **High** | 13-order team |
+./frontend/FRONTEND_ARCHITECTURE.md:448:| GAP-3 | WebSocket pass-through for `14-notification` realtime inbox is an open gateway item | Notification inbox realtime | confirm gateway WS proxy or document polling fallback | **Medium** | 15-gateway + 14-notification |
+./frontend/FRONTEND_ARCHITECTURE.md:449:| GAP-4 | Media presigned **download** endpoint (`GET /api/v1/media/{id}/download`) not found (only signed-url/presign-upload confirmed) | Product gallery, seller media | confirm download/signed-read endpoint | **Medium** | 12-media team |
+./frontend/FRONTEND_ARCHITECTURE.md:450:| GAP-5 | Admin surfaces thin: user mgmt beyond auth/admin, seller approval views, payments admin reads | Admin → Users/Sellers/Payments | enumerate admin read/mutation endpoints | **Medium** | 01-auth/03-seller/09-payment |
+./frontend/FRONTEND_ARCHITECTURE.md:451:| GAP-6 | Customer "my reviews" list endpoint unconfirmed | `/account/reviews` | confirm `GET /api/v1/review/me` or filter | **Low** | 08-review team |
+./frontend/FRONTEND_ARCHITECTURE.md:463:| Backend gaps (GAP-1/2) block seller storefront + fulfillment | Med | High | triage with backend owners before Seller phase; stub screens behind flags |
+./frontend/FRONTEND_ARCHITECTURE.md:491:| 15 | GAP-1/GAP-2 owners engaged (unblocks Seller phase) | ⬜ track |
+./frontend/FRONTEND_ARCHITECTURE.md:505:| **Seller portal** | products/inventory, seller orders, coupons, media presign, analytics (needs GAP-1/2) | list product + fulfill order |
+./frontend/docs/conformance/live-verification.md:6:Seller auth (JWT `role=shopkeeper`) · shop direct reachable (`:10003`) · shop profile edit (PATCH) · shop hours GET · category tree · **product create / edit / add-variant / stock / publish / unpublish** · seller own-product listing (client owner-filter, GAP-12) · customer browse · search · product detail (with variants) · **add-to-cart / update-qty / remove** · wishlist add+get · order placement (201) · order history (200) · shipping-by-sub-order (endpoint works; 404 = no shipment created yet).
+./frontend/docs/conformance/live-verification.md:10:### 1. Shop unreachable via the gateway — **GATEWAY / CONFIG** (GAP-1, hard blocker)
+./frontend/docs/conformance/live-verification.md:29:- `POST :10003/api/v1/shop/shops/{id}/logo` → **501** `not_implemented: Media gRPC client is wired but PresignUpload is not implemented`. Compounded by media presign returning a VPC-internal URL (`172.31.36.11:9002`, GAP-15) unreachable by browsers. Blocks all image upload (shop logo/banner, product images, avatar, KYC docs, review photos).
+./frontend/docs/conformance/live-verification.md:31:### 6. Seller order listing → 404/405 — **BACKEND (endpoint missing, GAP-13)**
+./frontend/docs/conformance/live-verification.md:39:- **1 gateway/config bug** (GAP-1 shop routing) — blocks the browser-side seller/shop surface.
+./frontend/components/product-card.tsx:8:// GAP-5: no image refs in the payload → branded ProductImage placeholder. The card carries shop_id in
+./frontend/components/product-card.tsx:9:// the link (?shop=) so the product page's add-to-cart has it (mitigates GAP-6).
+./frontend/components/product-card.tsx:23:      <div className="mt-1 flex items-baseline gap-2">
+./frontend/components/product-card.tsx:32:      <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+./frontend/components/product-grid.tsx:7:    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+./frontend/components/product-grid.tsx:17:    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5" aria-hidden>
+./frontend/components/remediation-card.tsx:21:      <div className="flex flex-wrap items-center gap-2">
+./frontend/components/site-header.tsx:97:      <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2.5">
+./frontend/components/site-header.tsx:143:        <nav className="flex shrink-0 items-center gap-3 text-sm">
+./frontend/components/doc-viewer.tsx:27:    <div className="flex flex-col gap-6 lg:flex-row">
+./frontend/components/product-image.tsx:1:// GAP-5: products carry no image refs in the public payload. Instead of a blank box, render a
+./frontend/features/product/add-to-cart.tsx:9:// Authed → server cart (cart/me). Guest → client-side cart (GAP-4), merged on login.
+./frontend/features/product/product-extras.tsx:8:// Reviews + recommendations are Bearer-gated (GAP-3) → only when logged in; otherwise a prompt.
+./frontend/features/cart/cart-view.tsx:17:  // GAP-4: guests get a client-side cart (persisted), merged into the server cart on login.
+./frontend/features/cart/cart-view.tsx:31:            <li key={l.product_id + l.variant_id} className="flex items-center gap-4 p-4 text-sm">
+./frontend/features/cart/cart-view.tsx:37:              <div className="flex items-center gap-2">
+./frontend/features/cart/cart-view.tsx:72:            <li key={id || l.product_id} className="flex items-center gap-4 p-4">
+./frontend/features/cart/cart-view.tsx:80:              <div className="flex items-center gap-2">
+./frontend/features/search/search-results.tsx:7:// GAP-2: the search API filters only by category server-side. We over-fetch (top N) and apply price /
+./frontend/features/search/search-results.tsx:38:    <div className="flex flex-col gap-6 md:flex-row">
+./frontend/features/search/search-results.tsx:51:          <div className="flex gap-2">
+./frontend/features/search/search-results.tsx:58:          <div className="flex flex-wrap gap-1">
+./frontend/features/search/search-results.tsx:64:        <label className="flex items-center gap-2"><input type="checkbox" checked={inStock} onChange={(e) => { setInStock(e.target.checked); setPage(1); }} /> In stock only</label>
+./frontend/features/search/search-results.tsx:71:          <nav className="mt-6 flex items-center justify-center gap-3 text-sm" aria-label="Pagination">
+./frontend/README.md:96:- **Phase 3 — Marketplace ✅** SSR homepage / search / category / product detail (public catalog+search) · authed cart (optimistic) · wishlist · **working COD checkout** (cart → checkout-package quote → order placement, verified end-to-end → order history). Online payment is the only "coming soon" piece. Gaps GAP-1..6 in COMMAND.md.
+./frontend/README.md:97:- **Phase 4 — Customer Portal ✅** authed `/account` (dashboard, profile, orders + detail, wallet, addresses w/ RHF+Zod geo cascade, notifications polling, reviews) + enhanced wishlist. CSR via BFF + TanStack Query. Gaps GAP-7..11 in COMMAND.md.
+./frontend/README.md:98:- **Phase 5 — Seller Portal ✅** (heavily backend-gated) `/seller` shell (10 routes, shopkeeper/shop_staff RBAC). Functional: product create/edit/stock (draft) + coupon listing. Blocked w/ honest empty states: orders, media, analytics, shop, publish. Gaps GAP-12..19 in COMMAND.md.
+./frontend/README.md:99:- **Phase 6 — Admin Portal ✅** `/admin` (admin/platform_staff): dashboard (platform KPIs + charts), payments, reports, risk, users/KYC, wallets, system health + observability. Real reporting/payment/risk data. Gaps GAP-20..22.
+./frontend/COMMAND.md:115:**Known gaps (backend):** GAP-1 seller storefront (gateway prefix `seller/*` ≠ service `shop/*`, 404) ·
+./frontend/COMMAND.md:116:GAP-2 search filters limited to `category_id` (no price/rating/brand/seller/sort) · GAP-3 reviews+recs
+./frontend/COMMAND.md:117:Bearer-gated (authed only) · GAP-4 guest cart 401 (cart requires login) · GAP-5 product images not in
+./frontend/COMMAND.md:118:public catalog/search (placeholder) · GAP-6 product detail lacks shop_id for cart (passed via `?shop=`).
+./frontend/COMMAND.md:132:**Phase 4 gaps:** GAP-7 order list has no backend filter/page params (client-side) · GAP-8 shipment
+./frontend/COMMAND.md:133:tracking (17-shipping) not in customer gateway set · GAP-9 notifications realtime is NATS not REST →
+./frontend/COMMAND.md:134:**polling** (30s) · GAP-10 review-list "mine" filter unverified · GAP-11 `profile/me` 404 until the Kafka
+./frontend/COMMAND.md:144:# data path (privileged token — shopkeeper can't be self-provisioned, GAP-19):
+./frontend/COMMAND.md:151:**Phase 5 gaps (seller is heavily backend-gated):** GAP-1 seller/shop service unreachable (gateway `seller/*`
+./frontend/COMMAND.md:153:GAP-12 catalog list not seller-scoped (owner-filtered client-side; draft visibility varies) · GAP-13 no seller
+./frontend/COMMAND.md:154:order list (only buyer's `/orders/me`) · GAP-14 coupon activation is admin `approve` · GAP-15 media presign
+./frontend/COMMAND.md:155:points at internal MinIO host · GAP-16 media list `/media` 404 · GAP-17 catalog write request schemas
+./frontend/COMMAND.md:156:undocumented in OpenAPI · GAP-18 no inventory-history API · GAP-19 shopkeeper not self-serviceable at signup
+./frontend/COMMAND.md:174:observability model). **Blocked (honest states):** sellers (GAP-1), per-order monitoring (GAP-13),
+./frontend/COMMAND.md:175:admin notifications (GAP-21). **Phase 6 gaps:** GAP-20 no user-list API (lookup by id) · GAP-21 no
+./frontend/COMMAND.md:176:platform-wide notification API · GAP-22 observability tools internal-only (deep-link needs a BFF proxy).
+./frontend/COMMAND.md:195:a separate spec repo). Internal observability tools are not browser-reachable (GAP-22).
+./frontend/COMMAND.md:206:curl -s $H/search | grep -oE 'Min rating|In stock only'                     # GAP-2 facets
+./frontend/COMMAND.md:207:curl -s $H/cart | grep -oE 'Your cart is empty'                             # GAP-4 guest cart branch
+./frontend/COMMAND.md:209:curl -s $H/search | grep -oE 'bg-gradient-to-br from-[a-z]+-400' | head -1  # GAP-5 branded placeholder
+./frontend/content/devops/handbook.ts:77:  dashboards: "Kibana (logs + APM) + Grafana/Prometheus (metrics) on the internal ops network — not browser-reachable; deep-linking needs a BFF reverse-proxy (GAP-22).",
+./frontend/.claude/workflows/dokandar-conformance-audit.js:20:  {id:'03-seller', gw:'seller', auth:'bearer', note:'STRUCTURAL BLOCKER (GAP-1): service serves /api/v1/shop/* but the gateway routes /api/v1/seller/* verbatim (no rewrite) -> EVERY endpoint is unreachable through the edge. Classify user-facing ones blocked_by_backend; capture how the frontend seller portal handles it (resilient UX / diagnostics).'},
+./frontend/.claude/workflows/dokandar-conformance-audit.js:100:  { label: 'synth:summary+backlog', prompt: `${RECS} Produce TWO deliverables. (A) ${CONF}/06-final-coverage-summary.md — the Final Coverage Summary: grand totals by classification, Backend Feature Coverage %, Frontend Feature Coverage %, Reachable UI Coverage %, the top structural blockers (seller GAP-1 etc.), and an honest statement of what is verifiable vs source-only. (B) ${CONF}/backlog.json — a PRIORITIZED implementation backlog: array of work items {id, title, cluster(e.g. seller|checkout|wallet|reviews|notifications|admin|search|profile|media), priority(P0|P1|P2), type(wire-missing|finish-partial|fix-drift|remove-dead|backend-blocked-note), endpoints[], frontend_targets[], est_effort(S|M|L), blocked_by_backend(bool), acceptance}. P0 = user-facing + reachable + currently missing/broken. Write both files. Return the P0 list (titles only).` },
+./frontend/lib/services/admin.ts:4: *  seller mgmt (GAP-1), admin order list (GAP-13), user list (GAP-20), admin notifications (GAP-21). */
+./frontend/lib/services/admin.ts:38:// GAP-13 mitigation: no admin order list, but a specific order can be looked up by id
+./frontend/lib/services/cart.ts:6:// Cart is authed-only (the gateway 401s guest-cart paths — GAP-4). authedFetch attaches the Bearer
+./frontend/lib/services/cart.ts:53:// GAP-4: on login, replay the client-side guest cart into the server cart, then clear it.
+./frontend/lib/services/seller.ts:4: *  service (GAP-1), seller order list (GAP-13), media (GAP-15/16), analytics/reporting. */
+./frontend/lib/services/seller.ts:17:// products (catalog write model) — functional; list-in-shop is GAP-1-blocked
+./frontend/lib/services/seller.ts:45:// coupons — list functional; create needs a shop (GAP-1)
+./frontend/lib/services/account.ts:55:// reviews (GAP-10: list filter for "mine" unverified — treated as the authed user's reviews)
+./frontend/lib/services/account.ts:61:// GAP-8: shipment tracking — 17-shipping is customer-reachable by sub-order id
+./frontend/stores/guest-cart.ts:5:// GAP-4 workaround: the gateway 401s guest-cart paths, so guests get a CLIENT-SIDE cart persisted in
+./frontend/GAP_REGISTER.md:13:| GAP-1 seller/shop 404 | C | Seller dashboard: live diagnostics, shop-status card, publish-prereqs, disabled publish; remediation cards across seller+admin | No shop setup/publish/seller-orders | 15-gateway / 03-seller | Route `/api/v1/seller/*` → service `/api/v1/shop/*` | Mitigated (resilient) |
+./frontend/GAP_REGISTER.md:14:| GAP-2 search filters | A | Over-fetch (size 100) + client price/rating/in-stock facets, labeled "top N" | Rich filtering on the window | 05-search | Add price/rating/brand/seller/sort params | **Fixed** |
+./frontend/GAP_REGISTER.md:15:| GAP-3 reviews/recs gated | B | Shown when logged-in; "log in to see" for guests | Guests don't see reviews/recs | 08/16/15 | Allow public GET reviews/recs | Resilient |
+./frontend/GAP_REGISTER.md:16:| GAP-4 guest cart 401 | A | Client-side cart (Zustand+localStorage) + merge into cart/me on login | Guests can shop pre-login | 06-cart/15 | Allow `/cart/guest/*` unauth | **Fixed** |
+./frontend/GAP_REGISTER.md:17:| GAP-5 no product images | B | Branded deterministic placeholders (colour+initial) everywhere | UI looks intentional | 04-catalog/12-media | Add `media_id` to product payload | Resilient (UX complete) |
+./frontend/GAP_REGISTER.md:18:| GAP-6 no shop_id on detail | B | Cards carry `?shop=`; add-to-cart uses it | Add-to-cart works from listings | 04-catalog | Include shop_id on product detail | Mostly fixed |
+./frontend/GAP_REGISTER.md:19:| GAP-7 order list no params | A | Client-side filter + pagination | Order history filterable | 13-order | Add filter/page params | **Fixed** |
+./frontend/GAP_REGISTER.md:20:| GAP-8 shipment tracking | A | Order detail fetches `shipping/shipments/by-order/{id}` per sub-order | Live tracking when shipped | 17-shipping (reachable) | — (works) | **Fixed** |
+./frontend/GAP_REGISTER.md:21:| GAP-9 notifications realtime | B | Polling (30s) + manual refresh + last-synced + preferences editor | Near-real-time inbox | 14-notification | Expose WS/SSE in OpenAPI | Resilient (complete) |
+./frontend/GAP_REGISTER.md:22:| GAP-10 review "mine" filter | A/B | Defensive client owner-filter when rows carry an owner field | Correct "my reviews" if field exists | 08-review | Add `?author=me` or scope by token | Best-effort fixed |
+./frontend/GAP_REGISTER.md:23:| GAP-11 profile/me 404 (new) | B | Graceful "still syncing" + editable form | New users edit profile anyway | 02-profile | Sync projection on signup | Resilient |
+./frontend/GAP_REGISTER.md:24:| GAP-12 catalog not seller-scoped | A | Client owner-filter by user id | Seller sees own products | 04-catalog | Add `?owner=me` | **Fixed** |
+./frontend/GAP_REGISTER.md:25:| GAP-13 no seller/admin order list | B | Admin order lookup-by-id + aggregate chart; seller remediation | Inspect orders by id | 13-order | Add admin/seller order search | Mitigated |
+./frontend/GAP_REGISTER.md:26:| GAP-14 coupon activation admin | B | Seller creates draft → "pending approval" | Seller drafts coupons | 07-coupon | Seller self-activate or clear flow | Resilient |
+./frontend/GAP_REGISTER.md:27:| GAP-15 presign→internal MinIO | C | Local upload queue (object-URL previews, draft mgmt, blocked publish) | Stage images locally | 12-media/15 | Browser-reachable presign / upload proxy | Resilient |
+./frontend/GAP_REGISTER.md:28:| GAP-16 media list 404 | C | Remediation card + local drafts | — | 12-media/15 | Expose GET /media via gateway | Resilient |
+./frontend/GAP_REGISTER.md:29:| GAP-17 catalog write schemas | C | Product create/edit/stock work (shape derived); variant-create noted | Product CRUD works | 04-catalog | Document request bodies in OpenAPI | Partial |
+./frontend/GAP_REGISTER.md:30:| GAP-18 no inventory history | C | Stock view + adjust work; history noted | Current stock manageable | 04-catalog | Add stock-ledger endpoint | Noted (no API) |
+./frontend/GAP_REGISTER.md:31:| GAP-19 shopkeeper not self-service | C | N/A — provisioning/test limit | Can't QA seller authed in this env | 01-auth | Admin role-assignment endpoint | Noted (env limit) |
+./frontend/GAP_REGISTER.md:32:| GAP-20 no user list | B | Lookup-by-id + KYC queue | Admin finds users by id | 01/02 | Add paginated user search | Mitigated |
+./frontend/GAP_REGISTER.md:33:| GAP-21 no platform notif API | B | Remediation card; per-user inbox works | — | 14-notification | Admin delivery-monitoring API | Resilient |
+./frontend/GAP_REGISTER.md:34:| GAP-22 observability internal | B | Observability model documented in System | Operators know the join keys | platform | BFF reverse-proxy for Kibana/APM | Resilient |
+./frontend/GAP_REGISTER.md:43:| `/seller` `/seller/*` | Complete (CSR) | catalog/coupon ✅; shop ❌ (GAP-1) | ⚠️ frontend-ready, **unverifiable in this env (GAP-19)** |
+./frontend/GAP_REGISTER.md:58:| Seller portal | ✅ | ❌ GAP-1 (shop) | ⚠️ frontend-ready, unverifiable (GAP-19) |
+./frontend/GAP_REGISTER.md:69:- **GAP-17 variant-create form** awaits a documented request schema.
+./frontend/GAP_REGISTER.md:71:These need no backend change but were scoped out as low-value at current data volumes; everything gap-driven is complete.
+./frontend/app/wishlist/page.tsx:66:                <li key={id || w.product_id} className="flex items-center gap-4 p-4 text-sm">
+./frontend/app/account/notifications/page.tsx:6:// GAP-9: the realtime inbox is NATS (not in the REST OpenAPI), so we POLL (30s) and add a manual refresh
+./frontend/app/account/notifications/page.tsx:30:      <div className="flex flex-wrap items-center justify-between gap-2">
+./frontend/app/account/notifications/page.tsx:34:        <div className="flex items-center gap-3 text-sm">
+./frontend/app/account/notifications/page.tsx:50:              <li key={n.id} className={`flex items-start gap-3 p-3 text-sm ${read ? "" : "bg-muted/40"}`}>
+./frontend/app/account/notifications/page.tsx:64:        <div className="flex justify-center gap-3 text-sm">
+./frontend/app/account/wallet/page.tsx:70:        <div className="mb-3 flex flex-wrap gap-2">
+./frontend/app/account/wallet/page.tsx:84:          className="flex items-center gap-2"
+./frontend/app/account/profile/page.tsx:35:        <div className="flex gap-3">
+./frontend/app/account/orders/page.tsx:17:// Filtering/pagination are client-side (GAP-7: order list has no backend filter/page params).
+./frontend/app/account/orders/page.tsx:48:                  <div className="flex items-center gap-3">
+./frontend/app/account/orders/[orderId]/page.tsx:8:// GAP-8 fix: 17-shipping is customer-reachable by sub-order id. Renders the shipment status when one
+./frontend/app/account/page.tsx:31:      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+./frontend/app/account/layout.tsx:21:      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6 md:flex-row">
+./frontend/app/account/layout.tsx:23:          <nav className="flex gap-2 overflow-x-auto md:flex-col md:gap-1" aria-label="Account navigation">
+./frontend/app/account/addresses/page.tsx:60:                  <div className="flex shrink-0 flex-col items-end gap-1">
+./frontend/app/account/addresses/page.tsx:102:      <div className="grid gap-3 sm:grid-cols-2">
+./frontend/app/account/addresses/page.tsx:112:      <label className="flex items-center gap-2 text-sm"><input type="checkbox" {...register("is_default")} /> Set as default</label>
+./frontend/app/account/reviews/page.tsx:13:  // GAP-10: the list has no "mine" param. If rows carry an owner field, defensively scope to this user;
+./frontend/app/account/reviews/page.tsx:22:        Reviews are written from a purchased product page (verified-purchase gated). GAP-10: the backend list’s “mine” filter is unverified.
+./frontend/app/page.tsx:35:            <div className="flex flex-wrap gap-2">
+./frontend/app/seller/coupons/page.tsx:45:        <div className="flex flex-wrap gap-2">
+./frontend/app/seller/orders/page.tsx:11:        gap="GAP-13 / GAP-1"
+./frontend/app/seller/page.tsx:60:        <div className="flex items-center gap-2">
+./frontend/app/seller/page.tsx:75:      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+./frontend/app/seller/page.tsx:86:            <li key={p.label} className="flex items-center gap-2">
+./frontend/app/seller/page.tsx:104:          <Diag label="Media service" status={dMedia.data} gap="GAP-15/16" />
+./frontend/app/seller/layout.tsx:20:      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6 md:flex-row">
+./frontend/app/seller/layout.tsx:23:          <nav className="flex gap-2 overflow-x-auto md:flex-col md:gap-1" aria-label="Seller navigation">
+./frontend/app/seller/products/page.tsx:45:              <div className="flex items-center gap-3">
+./frontend/app/seller/products/page.tsx:54:        <div className="flex justify-center gap-3 text-sm">
+./frontend/app/seller/products/[productId]/page.tsx:12:    <div className="flex gap-1">
+./frontend/app/seller/products/[productId]/page.tsx:49:      <div className="flex items-center gap-2">
+./frontend/app/seller/products/[productId]/page.tsx:60:        <div className="flex gap-3">
+./frontend/app/seller/products/[productId]/page.tsx:75:              <li key={v.id} className="flex items-center justify-between gap-2 p-3">
+./frontend/app/seller/products/[productId]/page.tsx:77:                <div className="flex items-center gap-2">
+./frontend/app/seller/products/[productId]/page.tsx:106:    <div className="mt-3 flex items-center gap-2">
+./frontend/app/seller/products/new/page.tsx:47:        <div className="flex gap-3">
+./frontend/app/seller/products/new/page.tsx:51:        <div className="flex gap-3">
+./frontend/app/seller/shop/page.tsx:103:            <div className="mt-1 flex items-center gap-2 text-sm">
+./frontend/app/seller/media/page.tsx:7:// GAP-15/16: the media service can't round-trip through the gateway, so this is a LOCAL-ONLY staging
+./frontend/app/seller/media/page.tsx:39:          <ul className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-4">
+./frontend/app/seller/media/page.tsx:59:        gap="GAP-15 / GAP-16"
+./frontend/app/checkout/page.tsx:82:              <div className="flex gap-2">
+./frontend/app/checkout/page.tsx:91:              <label className="flex items-center gap-2 text-sm"><input type="radio" name="pay" checked readOnly /> Cash on delivery (COD)</label>
+./frontend/app/checkout/page.tsx:92:              <label className="mt-1 flex items-center gap-2 text-sm text-muted-foreground"><input type="radio" name="pay" disabled /> Online payment — coming soon</label>
+./frontend/app/error.tsx:16:      <div className="mt-6 flex gap-3">
+./frontend/app/product/[productId]/page.tsx:35:        <div className="grid gap-8 md:grid-cols-2">
+./frontend/app/providers.tsx:46:      // GAP-4: replay any client-side guest cart into the server cart on session restore.
+./frontend/app/devops/[section]/page.tsx:24:          <li key={i} className="flex gap-3 rounded-lg border border-border p-3 text-sm">
+./frontend/app/devops/[section]/page.tsx:40:      <nav className="mb-4 flex flex-wrap gap-2 text-sm" aria-label="Documents">
+./frontend/app/devops/page.tsx:11:      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+./frontend/app/admin/notifications/page.tsx:10:        gap="GAP-21"
+./frontend/app/admin/orders/page.tsx:15:      <div className="flex gap-2">
+./frontend/app/admin/orders/page.tsx:47:          <div className="flex h-32 items-end gap-1 rounded-lg border border-border p-3" role="img" aria-label="Orders per day">
+./frontend/app/admin/orders/page.tsx:55:        gap="GAP-13"
+./frontend/app/admin/page.tsx:30:        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{[0, 1, 2, 3].map((i) => <div key={i} className="h-20 animate-pulse rounded-lg bg-muted" />)}</div>
+./frontend/app/admin/page.tsx:35:          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+./frontend/app/admin/page.tsx:52:          <div className="flex h-32 items-end gap-1 rounded-lg border border-border p-3" role="img" aria-label="Orders per day bar chart">
+./frontend/app/admin/page.tsx:75:      <div className="flex flex-wrap gap-2 text-sm">
+./frontend/app/admin/layout.tsx:23:      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6 md:flex-row">
+./frontend/app/admin/layout.tsx:26:          <nav className="flex gap-2 overflow-x-auto md:flex-col md:gap-1" aria-label="Admin navigation">
+./frontend/app/admin/system/page.tsx:14:      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4 text-sm">
+./frontend/app/admin/users/page.tsx:22:        <div className="flex gap-2">
+./frontend/app/admin/users/page.tsx:44:                  <div className="flex gap-2">
+./frontend/app/admin/reports/page.tsx:21:          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 text-sm">
+./frontend/app/admin/wallets/page.tsx:16:      <div className="flex gap-2">
+./frontend/app/admin/sellers/page.tsx:11:        gap="GAP-1"
+./frontend/app/admin/sellers/[id]/page.tsx:11:        gap="GAP-1"
+./frontend/app/search/page.tsx:15:  // GAP-2: over-fetch a window (backend caps page size at 100) so client-side facets have data to filter.

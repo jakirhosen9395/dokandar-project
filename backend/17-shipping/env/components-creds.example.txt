@@ -1,0 +1,58 @@
+# env/components-creds.example.txt — infra-creds template for 17-shipping (### NN_Service format).
+#
+# REAL secrets go in env/components-creds.txt (GITIGNORED) — never in this committed
+# .example file. Workflow:
+#   cp env/components-creds.example.txt env/components-creds.txt
+#   $EDITOR env/components-creds.txt        # paste your REAL infra creds (the full ### dump)
+#   chmod 600 env/components-creds.txt
+#   ./env/init-env.sh .env.dev             # renders env/.env.dev
+#
+# init-env.sh reads env/components-creds.txt (gitignored). Paste your FULL infra status
+# dump (all ### blocks); 17-shipping uses only these:
+#   01_PostgreSQL 02_MongoDB 05_Kafka 07_Elastic_APM 13_Neo4j.
+# Other blocks are ignored — including 03_Elasticsearch (:9201), which is the
+# search/review business ES used ONLY by 05-search + 08-review.
+#
+# VERIFY-ONLY: 17-shipping verifies auth's JWTs with auth's PUBLIC key + the shared
+# INTERNAL_SERVICE_TOKEN — it NEVER holds a private key. Paste those into the
+# ### Auth_Identity block below (from 01-auth's rendered .env.dev). If that block is
+# left as a placeholder, init-env.sh falls back to auto-discovering the deployed
+# 01-auth's .env.dev (AUTH_ENV_FILE, default /opt/dokandar/01-auth/env/.env.dev).
+
+### 01_PostgreSQL
+   endpoint       postgresql://<user>:<password>@<host>:5432/postgres
+   host:port      <host>:5432
+   user           <user>
+   password       <password>
+
+### 02_MongoDB
+   endpoint       mongodb://<user>:<password>@<host>:27017/?authSource=admin
+   host:port      <host>:27017
+   user           <user>
+   password       <password>
+
+### 05_Kafka
+   bootstrap      <host>:9092
+   ui             http://<host>:8080
+   auth           none (PLAINTEXT)
+
+# --- 07's `elasticsearch` line is the APM-stack ES (:9200) — the application LOG SINK. ---
+### 07_Elastic_APM
+   elasticsearch  http://elastic:<apm-es-password>@<host>:9200
+   apm-ingest     http://<host>:8200  (Bearer token)
+   apm-token      <apm-bearer-token>
+   kibana-ui      http://<host>:5601  (login: elastic)
+   elastic-pass   <apm-es-password>
+
+### 13_Neo4j
+   bolt           bolt://<host>:7687
+   browser-ui     http://<host>:7474
+   user           neo4j
+   password       <password>
+
+# --- Auth_Identity — auth's PUBLIC key + shared east-west token (verify-only). ---
+# Paste from 01-auth's rendered .env.dev (JWT_PUBLIC_KEY_B64 / INTERNAL_SERVICE_TOKEN).
+# NEVER a private key. Leave as <placeholders> to use the AUTH_ENV_FILE fallback.
+### Auth_Identity
+   auth_service_public_key   <paste 01-auth .env.dev JWT_PUBLIC_KEY_B64>
+   internal_service_token    <paste 01-auth .env.dev INTERNAL_SERVICE_TOKEN>

@@ -1,0 +1,17 @@
+source "https://rubygems.org"
+
+gem "rails", "~> 8.1.3"          # Rails 8.1 (spec target; Ruby 4.0 → 3.4 drift)
+gem "pg", "~> 1.5"               # PostgreSQL — the sole writer + the only /ready gate
+gem "puma", ">= 6.0"             # Puma app server
+
+gem "jwt", "~> 2.9"              # RS256 verify-only (auth's public key)
+gem "prometheus-client", "~> 4.2"  # /metrics (RED + shipping_*)
+# Heavy/native gems are require:false — each layer requires its gem explicitly so the
+# minimal boot (the ops contract) doesn't load them (and their runtime libs) prematurely.
+gem "grpc", "~> 1.66", require: false        # Shipping.QuoteDelivery server (precompiled native gem)
+gem "grpc-tools", "~> 1.66", require: false  # protoc codegen at boot
+gem "rdkafka", "~> 0.19", require: false     # Kafka consume (order.*) + produce (shipment.* via outbox)
+gem "mongo", "~> 2.20", require: false       # the MongoDB forensic log sink
+gem "elastic-apm", "~> 4.7", require: false  # APM (ElasticAPM::Middleware insert_before 0)
+
+gem "tzinfo-data", platforms: %i[ windows jruby ]

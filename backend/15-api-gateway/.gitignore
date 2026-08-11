@@ -1,0 +1,5 @@
+env/.env.*
+env/components-creds.txt
+env/env.txt
+data/local/result.json
+data/cloud/result.json

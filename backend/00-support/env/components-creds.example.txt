@@ -1,0 +1,57 @@
+# env/components-creds.example.txt — infra-creds template for 00-support (### NN_Service format).
+#
+# REAL secrets go in env/components-creds.txt (GITIGNORED) — never in this committed
+# .example file. Workflow:
+#   cp env/components-creds.example.txt env/components-creds.txt
+#   $EDITOR env/components-creds.txt        # paste your REAL infra creds (the full ### dump)
+#   chmod 600 env/components-creds.txt
+#   # paste auth's JWT_PUBLIC_KEY_B64 + INTERNAL_SERVICE_TOKEN into ### Auth_Identity below
+#   ./env/init-env.sh .env.dev             # renders env/.env.dev  (DEV/STAGE only)
+#
+# init-env.sh reads env/components-creds.txt (gitignored). Paste your FULL infra status
+# dump (all ### blocks); 00-support uses only these:
+#   01_PostgreSQL 02_MongoDB 04_Redis 06_RabbitMQ 07_Elastic_APM.
+# Other blocks are ignored — including 03_Elasticsearch (:9201), which is the
+# search/review business ES used ONLY by 05-search + 08-review. The application
+# log-sink ES is the APM-stack ES (block 07, :9200) — never block 03.
+#
+# 00-support is a VERIFY-ONLY service: it does NOT mint JWTs. Paste auth's PUBLIC key
+# and the shared INTERNAL_SERVICE_TOKEN into the ### Auth_Identity block below (copy
+# from 01-auth's rendered env/.env.dev). init-env.sh reads them block-scoped; if left
+# as placeholders it falls back to AUTH_ENV_FILE=/opt/01-auth/env/.env.dev auto-discovery.
+
+### 01_PostgreSQL
+   endpoint       postgresql://<user>:<password>@<host>:5432/postgres
+   host:port      <host>:5432
+   user           <user>
+   password       <password>
+
+### 02_MongoDB
+   endpoint       mongodb://<user>:<password>@<host>:27017/?authSource=admin
+   host:port      <host>:27017
+   user           <user>
+   password       <password>
+
+### 04_Redis
+   endpoint       redis://default:<password>@<host>:6379/0
+   host:port      <host>:6379
+   user           default
+   password       <password>
+
+### 06_RabbitMQ
+   amqp-url       amqp://<user>:<password>@<host>:5672/
+   host:port      <host>:5672
+   user           <user>
+   password       <password>
+   ui             http://<host>:15672
+
+### 07_Elastic_APM
+   elasticsearch  http://elastic:<apm-es-password>@<host>:9200
+   apm-ingest     http://<host>:8200  (Bearer token)
+   apm-token      <apm-bearer-token>
+   kibana-ui      http://<host>:5601  (login: elastic)
+   elastic-pass   <apm-es-password>
+
+### Auth_Identity
+   auth_service_public_key   <paste 01-auth .env.dev JWT_PUBLIC_KEY_B64>
+   internal_service_token    <paste 01-auth .env.dev INTERNAL_SERVICE_TOKEN>

@@ -1,0 +1,24 @@
+# PostgreSQL — the sole writer + the only /ready gate. Driven entirely by env
+# (POSTGRES_*), with a statement_timeout bound on every connection (§16-e).
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  pool: <%= ENV.fetch("DB_POOL") { 12 } %>  # Puma threads + the relay/consumer worker threads
+  host: <%= ENV.fetch("POSTGRES_HOST", "localhost") %>
+  port: <%= ENV.fetch("POSTGRES_PORT", 5432) %>
+  username: <%= ENV.fetch("POSTGRES_USER", "postgres") %>
+  password: <%= ENV.fetch("POSTGRES_PASSWORD", "") %>
+  variables:
+    statement_timeout: <%= ENV.fetch("PG_STATEMENT_TIMEOUT_MS", 30000) %>
+
+development:
+  <<: *default
+  database: <%= ENV.fetch("POSTGRES_DB", "dokandar_shipping_dev") %>
+
+test:
+  <<: *default
+  database: <%= ENV.fetch("POSTGRES_DB", "dokandar_shipping_test") %>
+
+production:
+  <<: *default
+  database: <%= ENV.fetch("POSTGRES_DB", "dokandar_shipping_prod") %>

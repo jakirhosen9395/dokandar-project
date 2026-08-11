@@ -1,0 +1,130 @@
+---
+# Install + register a self-hosted GitLab shell runner on the gitlab-runner host,
+# with Docker + AWS CLI so pipeline jobs can build/push images and deploy over SSM.
+# Mirrors the manual runbook; idempotent.
+
+- name: Install unzip + curl
+  become: true
+  ansible.builtin.apt:
+    name: [unzip, curl]
+    update_cache: true
+    state: present
+
+- name: Install Docker via the official convenience script (includes the compose plugin + containerd)
+  become: true
+  ansible.builtin.shell: |
+    curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+    sh /tmp/get-docker.sh
+  args:
+    creates: /usr/bin/docker
+
+- name: Enable + start docker and containerd
+  become: true
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop:
+    - docker
+    - containerd
+
+- name: Install AWS CLI v2 (for ECR push + ssm:SendCommand via the instance role)
+  become: true
+  ansible.builtin.shell: |
+    set -e
+    curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+    cd /tmp && unzip -q -o awscliv2.zip && ./aws/install --update
+  args:
+    creates: /usr/local/bin/aws
+
+- name: Download the GitLab Runner binary
+  become: true
+  ansible.builtin.get_url:
+    url: "https://gitlab-runner-downloads.s3.amazonaws.com/latest/binaries/gitlab-runner-linux-amd64"
+    dest: /usr/local/bin/gitlab-runner
+    mode: "0755"
+
+- name: Create the gitlab-runner user
+  become: true
+  ansible.builtin.user:
+    name: gitlab-runner
+    comment: "GitLab Runner"
+    create_home: true
+    shell: /bin/bash
+
+- name: Install the gitlab-runner service
+  become: true
+  ansible.builtin.command: gitlab-runner install --user=gitlab-runner --working-directory=/home/gitlab-runner
+  args:
+    creates: /etc/systemd/system/gitlab-runner.service
+
+- name: Start + enable the gitlab-runner service
+  become: true
+  ansible.builtin.service:
+    name: gitlab-runner
+    state: started
+    enabled: true
+
+- name: Add gitlab-runner to the docker group
+  become: true
+  ansible.builtin.user:
+    name: gitlab-runner
+    groups: docker
+    append: true
+
+- name: Restart Docker to apply group membership
+  become: true
+  ansible.builtin.service:
+    name: docker
+    state: restarted
+
+- name: Disable the .bash_logout screen-clear (avoids interrupting CI jobs)
+  become: true
+  ansible.builtin.copy:
+    dest: /home/gitlab-runner/.bash_logout
+    owner: gitlab-runner
+    group: gitlab-runner
+    mode: "0644"
+    content: |
+      # ~/.bash_logout — screen-clear intentionally disabled for CI stability.
+
+- name: Check whether a runner is already registered on this host
+  become: true
+  ansible.builtin.command: gitlab-runner list
+  register: runner_list
+  changed_when: false
+  failed_when: false
+
+- name: Register the runner (shell executor, tag dokandar-runner)
+  become: true
+  ansible.builtin.command: >
+    gitlab-runner register --non-interactive
+    --url "{{ gitlab_url }}"
+    --token "{{ runner_token }}"
+    --executor "{{ runner_executor }}"
+    --description "{{ runner_description }}"
+  when: runner_token | default('') | length > 0 and 'dokandar' not in runner_list.stdout
+  no_log: true
+
+- name: Show runner status
+  become: true
+  ansible.builtin.command: gitlab-runner status
+  register: runner_status
+  changed_when: false
+  failed_when: false
+
+- name: Runner status
+  ansible.builtin.debug:
+    var: runner_status.stdout_lines
+
+- name: Allow all pipelines to build at once (concurrent = {{ runner_concurrent | default(20) }})
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/gitlab-runner/config.toml
+    regexp: '^concurrent ='
+    line: "concurrent = {{ runner_concurrent | default(20) }}"
+
+- name: Restart the runner to apply concurrency
+  become: true
+  ansible.builtin.command: gitlab-runner restart
+  changed_when: true

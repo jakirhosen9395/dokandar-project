@@ -1,0 +1,42 @@
+# DOKANDAR utility — Redis 8 · Docker Compose HA cluster (Redis Cluster: 3 primaries + 3 replicas).
+# 6 nodes on ports 7001-7006 (bus 17001-17006). Uses HOST networking + cluster-announce-ip = the host's
+# reachable IP so clients (local AND cross-host) can follow MOVED redirects to any node. Auth via
+# requirepass + masterauth. Per-node data are HOST bind mounts (AOF — survive `docker compose down -v`).
+name: dokandar_redis_cluster
+
+x-redis-node: &redis-node
+  image: redis:${REDIS_VERSION:-8}
+  restart: always
+  network_mode: host
+
+services:
+  redis-1:
+    <<: *redis-node
+    container_name: dokandar_redis_c1
+    command: ["redis-server","--port","7001","--cluster-enabled","yes","--cluster-config-file","/data/nodes.conf","--cluster-node-timeout","5000","--cluster-announce-ip","${CLUSTER_ANNOUNCE_IP:?run setup.sh up - it sets the announce IP}","--appendonly","yes","--dir","/data","--requirepass","${REDIS_PASSWORD:?run setup.sh up}","--masterauth","${REDIS_PASSWORD}"]
+    volumes: [{ type: bind, source: "${DATA_ROOT:-/data}/redis_cluster/n1", target: /data, bind: { create_host_path: true } }]
+  redis-2:
+    <<: *redis-node
+    container_name: dokandar_redis_c2
+    command: ["redis-server","--port","7002","--cluster-enabled","yes","--cluster-config-file","/data/nodes.conf","--cluster-node-timeout","5000","--cluster-announce-ip","${CLUSTER_ANNOUNCE_IP}","--appendonly","yes","--dir","/data","--requirepass","${REDIS_PASSWORD}","--masterauth","${REDIS_PASSWORD}"]
+    volumes: [{ type: bind, source: "${DATA_ROOT:-/data}/redis_cluster/n2", target: /data, bind: { create_host_path: true } }]
+  redis-3:
+    <<: *redis-node
+    container_name: dokandar_redis_c3
+    command: ["redis-server","--port","7003","--cluster-enabled","yes","--cluster-config-file","/data/nodes.conf","--cluster-node-timeout","5000","--cluster-announce-ip","${CLUSTER_ANNOUNCE_IP}","--appendonly","yes","--dir","/data","--requirepass","${REDIS_PASSWORD}","--masterauth","${REDIS_PASSWORD}"]
+    volumes: [{ type: bind, source: "${DATA_ROOT:-/data}/redis_cluster/n3", target: /data, bind: { create_host_path: true } }]
+  redis-4:
+    <<: *redis-node
+    container_name: dokandar_redis_c4
+    command: ["redis-server","--port","7004","--cluster-enabled","yes","--cluster-config-file","/data/nodes.conf","--cluster-node-timeout","5000","--cluster-announce-ip","${CLUSTER_ANNOUNCE_IP}","--appendonly","yes","--dir","/data","--requirepass","${REDIS_PASSWORD}","--masterauth","${REDIS_PASSWORD}"]
+    volumes: [{ type: bind, source: "${DATA_ROOT:-/data}/redis_cluster/n4", target: /data, bind: { create_host_path: true } }]
+  redis-5:
+    <<: *redis-node
+    container_name: dokandar_redis_c5
+    command: ["redis-server","--port","7005","--cluster-enabled","yes","--cluster-config-file","/data/nodes.conf","--cluster-node-timeout","5000","--cluster-announce-ip","${CLUSTER_ANNOUNCE_IP}","--appendonly","yes","--dir","/data","--requirepass","${REDIS_PASSWORD}","--masterauth","${REDIS_PASSWORD}"]
+    volumes: [{ type: bind, source: "${DATA_ROOT:-/data}/redis_cluster/n5", target: /data, bind: { create_host_path: true } }]
+  redis-6:
+    <<: *redis-node
+    container_name: dokandar_redis_c6
+    command: ["redis-server","--port","7006","--cluster-enabled","yes","--cluster-config-file","/data/nodes.conf","--cluster-node-timeout","5000","--cluster-announce-ip","${CLUSTER_ANNOUNCE_IP}","--appendonly","yes","--dir","/data","--requirepass","${REDIS_PASSWORD}","--masterauth","${REDIS_PASSWORD}"]
+    volumes: [{ type: bind, source: "${DATA_ROOT:-/data}/redis_cluster/n6", target: /data, bind: { create_host_path: true } }]

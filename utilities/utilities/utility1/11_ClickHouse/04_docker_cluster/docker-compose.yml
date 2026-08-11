@@ -1,0 +1,45 @@
+# ClickHouse — Docker Compose HA cluster: 1 shard x 3 replicas, coordinated by an embedded 3-node
+# ClickHouse Keeper quorum (no external ZooKeeper). Every node holds a full copy via ReplicatedMergeTree,
+# so any node serves reads and the loss of one node loses neither data nor availability.
+# Per-node config.d/users.d and data are HOST bind mounts (rendered by setup.sh; data survives `down -v`).
+x-ch: &ch
+  image: ${CH_IMAGE:-clickhouse/clickhouse-server:26.3}
+  restart: always
+  cap_add: [SYS_NICE]
+  ulimits:
+    nofile:
+      soft: 262144
+      hard: 262144
+
+services:
+  ch1:
+    <<: *ch
+    container_name: dokandar_clickhouse_c1
+    hostname: ch1
+    ports:
+      - "${CH_HTTP1:-8123}:8123"
+      - "${CH_TCP1:-9000}:9000"
+    volumes:
+      - ${DATA_ROOT:-/data}/clickhouse_cluster/n1/config.d:/etc/clickhouse-server/config.d
+      - ${DATA_ROOT:-/data}/clickhouse_cluster/n1/users.d:/etc/clickhouse-server/users.d
+      - ${DATA_ROOT:-/data}/clickhouse_cluster/n1/data:/var/lib/clickhouse
+  ch2:
+    <<: *ch
+    container_name: dokandar_clickhouse_c2
+    hostname: ch2
+    ports:
+      - "${CH_HTTP2:-8124}:8123"
+    volumes:
+      - ${DATA_ROOT:-/data}/clickhouse_cluster/n2/config.d:/etc/clickhouse-server/config.d
+      - ${DATA_ROOT:-/data}/clickhouse_cluster/n2/users.d:/etc/clickhouse-server/users.d
+      - ${DATA_ROOT:-/data}/clickhouse_cluster/n2/data:/var/lib/clickhouse
+  ch3:
+    <<: *ch
+    container_name: dokandar_clickhouse_c3
+    hostname: ch3
+    ports:
+      - "${CH_HTTP3:-8125}:8123"
+    volumes:
+      - ${DATA_ROOT:-/data}/clickhouse_cluster/n3/config.d:/etc/clickhouse-server/config.d
+      - ${DATA_ROOT:-/data}/clickhouse_cluster/n3/users.d:/etc/clickhouse-server/users.d
+      - ${DATA_ROOT:-/data}/clickhouse_cluster/n3/data:/var/lib/clickhouse

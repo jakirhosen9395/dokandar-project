@@ -1,0 +1,3 @@
+# local config (may hold SSH key paths / redis URLs) and generated run artifacts
+.env
+out/

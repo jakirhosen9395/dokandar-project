@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package dokandar.order.v1;
+
+option java_package = "com.dokandar.order.grpc.proto";
+option java_multiple_files = true;
+option java_outer_classname = "OrderProto";
+
+// Order — east-west purchase-verification API served by 13-order on :9090
+// (external 20013). Called by 08-review to gate verified-purchase reviews,
+// answered from order's own sub_orders/order_lines. Every RPC requires
+// `x-internal-token` == INTERNAL_SERVICE_TOKEN, compared constant-time
+// (MessageDigest.isEqual); mismatch -> UNAUTHENTICATED (code 16).
+service Order {
+    rpc HasPurchased (HasPurchasedRequest) returns (HasPurchasedResponse);
+}
+
+message HasPurchasedRequest {
+    string user_id      = 1;
+    string sub_order_id = 2;
+    string product_id   = 3;
+}
+
+message HasPurchasedResponse {
+    bool   purchased       = 1;
+    string sub_order_state = 2;
+}

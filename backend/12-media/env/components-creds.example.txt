@@ -1,0 +1,54 @@
+# env/components-creds.example.txt — infra-creds template for 12-media (### NN_Service format).
+#
+# REAL secrets go in env/components-creds.txt (GITIGNORED) — never in this committed
+# .example file. Workflow:
+#   cp env/components-creds.example.txt env/components-creds.txt
+#   $EDITOR env/components-creds.txt        # paste your REAL infra creds (the full ### dump)
+#   chmod 600 env/components-creds.txt
+#   ./env/init-env.sh .env.dev             # renders env/.env.dev
+#
+# init-env.sh reads env/components-creds.txt (gitignored). Paste your FULL infra status
+# dump (all ### blocks); 12-media uses only these:
+#   01_PostgreSQL 02_MongoDB 05_Kafka 07_Elastic_APM 10_RustFS.
+# Other blocks are ignored — including 03_Elasticsearch (:9201), which is the
+# search/review business ES used ONLY by 05-search + 08-review. The application
+# LOG-SINK ES is the APM-stack ES (block 07_Elastic_APM, :9200).
+#
+# 12-media is VERIFY-ONLY: it does NOT mint JWT keys. Paste 01-auth's rendered
+# JWT_PUBLIC_KEY_B64 + INTERNAL_SERVICE_TOKEN into the ### Auth_Identity block below
+# (from 01-auth's env/.env.dev). It never generates a keypair.
+
+### 01_PostgreSQL
+   endpoint       postgresql://postgres:CHANGE_ME@<host>:5432/postgres
+   host:port      <host>:5432
+   user           postgres
+   password       CHANGE_ME
+
+### 02_MongoDB
+   endpoint       mongodb://dokandar:CHANGE_ME@<host>:27017/?authSource=admin
+   host:port      <host>:27017
+   user           dokandar
+   password       CHANGE_ME
+
+### 05_Kafka
+   bootstrap      <host>:9092
+   ui             http://<host>:8080
+   auth           none (PLAINTEXT)
+
+### 07_Elastic_APM
+   elasticsearch  http://elastic:CHANGE_ME@<host>:9200
+   apm-ingest     http://<host>:8200  (Bearer token)
+   apm-token      CHANGE_ME
+   kibana-ui      http://<host>:5601  (login: elastic)
+   elastic-pass   CHANGE_ME
+   kibana_system  CHANGE_ME
+
+### 10_RustFS
+   s3-endpoint    http://<host>:9002
+   console-ui     http://<host>:9001
+   access-key     CHANGE_ME
+   secret-key     CHANGE_ME
+
+### Auth_Identity        # NOT present for 01-auth (it MINTS these)
+   auth_service_public_key   <paste 01-auth .env.dev JWT_PUBLIC_KEY_B64>
+   internal_service_token    <paste 01-auth .env.dev INTERNAL_SERVICE_TOKEN>

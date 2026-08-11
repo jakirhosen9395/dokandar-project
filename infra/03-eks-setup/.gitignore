@@ -1,0 +1,39 @@
+# Terraform state — contains sensitive values (private keys, secrets). NEVER commit.
+*.tfstate
+*.tfstate.*
+
+# Provider plugins / working dir
+**/.terraform/*
+.terraform/
+
+# Crash logs
+crash.log
+crash.*.log
+
+# Variable files may contain secrets
+*.tfvars
+*.tfvars.json
+
+# CLI config
+.terraformrc
+terraform.rc
+
+# Generated SSH private keys (Terraform writes ../keys/*.pem)
+keys/
+*.pem
+
+# Local overrides
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# The provider lock file (.terraform.lock.hcl) IS intentionally committed.
+
+# Terraform-generated ansible inventory
+ansible/inventory.ini
+
+# Ansible-rendered secrets (never commit)
+ansible/.creds/
+ansible/.envs/
+keys/

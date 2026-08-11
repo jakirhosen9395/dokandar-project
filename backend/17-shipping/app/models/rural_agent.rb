@@ -1,0 +1,2 @@
+class RuralAgent < ApplicationRecord
+end

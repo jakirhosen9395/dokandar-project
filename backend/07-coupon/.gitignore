@@ -1,0 +1,26 @@
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+
+env/.env.dev
+env/.env.stage
+env/.env.prod
+env/components-creds.txt
+env/env.txt
+
+data/local/result.json
+data/cloud/result.json
+env/.env.*
+
+# .NET
+bin/
+obj/
+*.user

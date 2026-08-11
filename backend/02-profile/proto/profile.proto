@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package dokandar.profile.v1;
+
+option go_package = "github.com/dokandar/dokandar-profile/internal/grpcserver/pb;pb";
+
+// ProfileQuery — east-west reads.
+// Every RPC requires `x-internal-token` metadata equal to the service's
+// configured INTERNAL_SERVICE_TOKEN; mismatch → UNAUTHENTICATED.
+service ProfileQuery {
+    rpc LookupProfile(LookupProfileRequest) returns (Profile);
+    rpc GetDefaultAddress(GetDefaultAddressRequest) returns (Address);
+}
+
+message LookupProfileRequest {
+    string user_id = 1;
+}
+
+message GetDefaultAddressRequest {
+    string user_id = 1;
+}
+
+message Profile {
+    string user_id        = 1;
+    string phone          = 2;
+    string email          = 3;
+    string name_en        = 4;
+    string name_bn        = 5;
+    string locale         = 6;
+    string kyc            = 7;  // unverified | submitted | verified | rejected
+    string avatar_url     = 8;
+    string whatsapp_number= 9;
+}
+
+message Address {
+    string id              = 1;
+    string user_id         = 2;
+    string label           = 3;
+    string recipient_name  = 4;
+    string recipient_phone = 5;
+    string division_code   = 6;
+    string district_code   = 7;
+    string upazila_code    = 8;
+    string union_code      = 9;
+    string line1           = 10;
+    string line2           = 11;
+    string landmark        = 12;
+    double lat             = 13;
+    double lng             = 14;
+}

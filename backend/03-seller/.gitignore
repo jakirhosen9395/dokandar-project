@@ -1,0 +1,44 @@
+/.phpunit.cache
+/node_modules
+/public/build
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+/vendor
+.phpactor.json
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+auth.json
+
+# Seller service env conventions (mirrors auth/profile) — REAL secrets, never commit
+env/.env.*
+!env/.env.*.example
+env/components-creds.txt
+env/env.txt
+.env
+.env.backup
+.env.production
+
+logs/
+data/local/result.json
+data/cloud/result.json
+
+.fleet
+.idea
+.nova
+.vscode
+.zed
+
+# prebuilt PHP extensions (.so) — ignored, EXCEPT grpc.so which is vendored
+# (committed) so a bare `git clone … docker build` works without an out-of-band
+# step. NOTE: this grpc.so is amd64 / php8.3 — on arm64 hosts rebuild it.
+docker/ext/*.so
+!docker/ext/grpc.so
+
+# shared fleet secrets bundle — never commit
+fleet-secrets.txt
+fleet-secrets.public.txt
+env/fleet-secrets.txt
+env/fleet-secrets.public.txt

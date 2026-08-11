@@ -1,0 +1,33 @@
+# DOKANDAR utility — RabbitMQ 4.x · Docker Compose single-node (with the Management UI plugin).
+# Auth ON (admin user). Data is a HOST BIND MOUNT (${DATA_ROOT}/rabbitmq_docker) → survives
+# `docker compose down -v`. A FIXED hostname keeps the mnesia data dir (rabbit@<hostname>) stable across
+# restarts, so the data is actually reused.
+name: dokandar_rabbitmq_single
+services:
+  rabbitmq:
+    image: rabbitmq:${RABBITMQ_IMAGE_TAG:-4-management}
+    container_name: dokandar_rabbitmq_docker_single
+    restart: always
+    hostname: dokandar-rabbit   # stable nodename => stable /var/lib/rabbitmq/mnesia/rabbit@dokandar-rabbit
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-dokandar}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?set RABBITMQ_DEFAULT_PASS in .env (or run setup.sh up)}
+    ports:
+      - "${RABBITMQ_AMQP_PORT:-5672}:5672"
+      - "${RABBITMQ_MGMT_PORT:-15672}:15672"
+    volumes:
+      - type: bind
+        source: ${DATA_ROOT:-/data}/rabbitmq_docker
+        target: /var/lib/rabbitmq
+        bind:
+          create_host_path: true
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 25s
+    networks: [dokandar_rabbitmq_net]
+networks:
+  dokandar_rabbitmq_net:
+    name: dokandar_rabbitmq_net

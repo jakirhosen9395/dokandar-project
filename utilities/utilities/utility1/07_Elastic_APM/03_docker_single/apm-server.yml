@@ -1,0 +1,40 @@
+# apm-server config (ported from github.com/jakirhosen9395/elastic-apm). Bind-mounted read-only into the
+# apm-server container; ${APM_SECRET_TOKEN} / ${ELASTIC_PASSWORD} are resolved by apm-server at runtime
+# from its container environment (NOT by docker compose).
+apm-server:
+  host: "0.0.0.0:8200"
+
+  # Secret token agents must present (REQUIRED).
+  secret_token: "${APM_SECRET_TOKEN}"
+
+  # API-key authentication (more secure; recommended alongside the token).
+  api_key:
+    enabled: true
+
+  auth:
+    secret_token: "${APM_SECRET_TOKEN}"
+
+  # Real User Monitoring (browser RUM agent).
+  rum:
+    enabled: true
+    allow_origins: ['*']        # restrict for production
+    allow_service_names: []
+    source_mapping:
+      enabled: false
+
+output.elasticsearch:
+  hosts: ["elasticsearch:9200"]
+  username: "elastic"
+  password: "${ELASTIC_PASSWORD}"
+
+setup.kibana:
+  host: "kibana:5601"
+  username: "elastic"
+  password: "${ELASTIC_PASSWORD}"
+
+setup.template.enabled: true
+setup.dashboards.enabled: true
+
+logging.level: info
+logging.to_stderr: true
+logging.to_files: false

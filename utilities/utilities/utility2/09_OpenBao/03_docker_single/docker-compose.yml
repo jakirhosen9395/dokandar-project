@@ -1,0 +1,32 @@
+# DOKANDAR utility — OpenBao 2.x · Docker Compose single-node (secrets store).
+# File storage on a HOST BIND MOUNT (${DATA_ROOT}/openbao_docker) → survives `docker compose down -v`
+# (the seal + secrets persist). setup.sh initialises + unseals + enables KV v2 after `up`. Runs as root
+# so the bind-mounted data dir is writable (dev convenience).
+name: dokandar_openbao_single
+services:
+  openbao:
+    image: openbao/openbao:${BAO_VERSION:-2.5.4}
+    container_name: dokandar_openbao_docker_single
+    restart: always
+    user: "0:0"
+    cap_add: [IPC_LOCK]
+    # bypass the image entrypoint (it su-execs to a non-root user, which can't write the root-owned bind
+    # dir) and run bao directly as root so the file-storage data dir is writable.
+    entrypoint: ["bao"]
+    command: ["server", "-config=/openbao/config/openbao.hcl"]
+    ports:
+      - "${BAO_API_PORT:-8200}:8200"
+    volumes:
+      - type: bind
+        source: ./openbao.hcl
+        target: /openbao/config/openbao.hcl
+        read_only: true
+      - type: bind
+        source: ${DATA_ROOT:-/data}/openbao_docker
+        target: /openbao/data
+        bind:
+          create_host_path: true
+    networks: [dokandar_openbao_net]
+networks:
+  dokandar_openbao_net:
+    name: dokandar_openbao_net

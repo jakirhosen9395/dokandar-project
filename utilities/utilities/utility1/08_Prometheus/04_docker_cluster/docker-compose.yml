@@ -1,0 +1,66 @@
+# DOKANDAR utility — Prometheus 3.12 · Docker Compose HA cluster (2 replicas + Thanos Querier).
+# Two Prometheus replicas (prom-a, prom-b) scrape the SAME targets; a Thanos sidecar exposes each
+# replica's data over gRPC; the Thanos Querier (:10902) fans out to both and DEDUPLICATES by the `replica`
+# external label — so a replica failure is invisible at query time. Per-replica TSDB is HOST bind-mounted.
+name: dokandar_prometheus_cluster
+services:
+  prom-a:
+    image: prom/prometheus:v${PROM_VERSION:-3.12.0}
+    container_name: dokandar_prom_a
+    restart: always
+    user: "65534:65534"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}
+      - --web.listen-address=0.0.0.0:9090
+      - --web.enable-lifecycle
+    ports:
+      - "${PROM_A_PORT:-9090}:9090"
+    volumes:
+      - { type: bind, source: ./prometheus-a.yml, target: /etc/prometheus/prometheus.yml, read_only: true }
+      - { type: bind, source: "${DATA_ROOT:-/data}/prometheus_cluster/a", target: /prometheus, bind: { create_host_path: true } }
+    networks: [dokandar_prom_cluster_net]
+  prom-b:
+    image: prom/prometheus:v${PROM_VERSION:-3.12.0}
+    container_name: dokandar_prom_b
+    restart: always
+    user: "65534:65534"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}
+      - --web.listen-address=0.0.0.0:9090
+      - --web.enable-lifecycle
+    ports:
+      - "${PROM_B_PORT:-9092}:9090"
+    volumes:
+      - { type: bind, source: ./prometheus-b.yml, target: /etc/prometheus/prometheus.yml, read_only: true }
+      - { type: bind, source: "${DATA_ROOT:-/data}/prometheus_cluster/b", target: /prometheus, bind: { create_host_path: true } }
+    networks: [dokandar_prom_cluster_net]
+  sidecar-a:
+    image: quay.io/thanos/thanos:v${THANOS_VERSION:-0.41.0}
+    container_name: dokandar_thanos_sidecar_a
+    restart: always
+    command: ["sidecar", "--prometheus.url=http://prom-a:9090", "--grpc-address=0.0.0.0:10901", "--http-address=0.0.0.0:10902"]
+    depends_on: [prom-a]
+    networks: [dokandar_prom_cluster_net]
+  sidecar-b:
+    image: quay.io/thanos/thanos:v${THANOS_VERSION:-0.41.0}
+    container_name: dokandar_thanos_sidecar_b
+    restart: always
+    command: ["sidecar", "--prometheus.url=http://prom-b:9090", "--grpc-address=0.0.0.0:10901", "--http-address=0.0.0.0:10902"]
+    depends_on: [prom-b]
+    networks: [dokandar_prom_cluster_net]
+  querier:
+    image: quay.io/thanos/thanos:v${THANOS_VERSION:-0.41.0}
+    container_name: dokandar_thanos_querier
+    restart: always
+    command: ["query", "--http-address=0.0.0.0:10902", "--grpc-address=0.0.0.0:10901", "--query.replica-label=replica", "--endpoint=sidecar-a:10901", "--endpoint=sidecar-b:10901"]
+    ports:
+      - "${THANOS_PORT:-10902}:10902"
+    depends_on: [sidecar-a, sidecar-b]
+    networks: [dokandar_prom_cluster_net]
+networks:
+  dokandar_prom_cluster_net:
+    name: dokandar_prom_cluster_net

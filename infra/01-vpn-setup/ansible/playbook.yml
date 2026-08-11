@@ -1,0 +1,28 @@
+---
+# A fresh EC2 needs 1-3 minutes for its SSM agent to register. Poll until the
+# instance shows PingStatus=Online, otherwise the first task fails with
+# "TargetNotConnected".
+- name: Wait for the OpenVPN host to register with SSM
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Poll SSM until the instance is Online (up to 5 min)
+      ansible.builtin.command: >
+        aws ssm describe-instance-information
+        --filters "Key=InstanceIds,Values={{ hostvars[groups['openvpn'][0]].ansible_host }}"
+        --query "InstanceInformationList[0].PingStatus" --output text
+        --region {{ hostvars[groups['openvpn'][0]].ansible_aws_ssm_region }}
+      register: ssm_ping
+      until: ssm_ping.stdout == "Online"
+      retries: 30
+      delay: 10
+      changed_when: false
+
+# Install and configure OpenVPN entirely over AWS SSM (no SSH/SCP).
+- name: Install and configure OpenVPN
+  hosts: openvpn
+  gather_facts: true
+  become: true
+  roles:
+    - openvpn

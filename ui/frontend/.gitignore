@@ -1,0 +1,38 @@
+# ---- dependencies / build output ----
+node_modules/
+.next/
+out/
+dist/
+build/
+coverage/
+
+# ---- env / secrets (keep the template) ----
+.env
+.env.*
+!.env.example
+env/*.env.*
+env/*.local
+
+# ---- lockfile backups ----
+pnpm-lock.yaml.backup
+
+# ---- generated: ignore the pinned raw specs (reproducible via `pnpm gen:api`);
+#      KEEP the generated TypeScript clients + MANIFEST (required at build/runtime) ----
+generated/openapi/raw/*.json
+
+# ---- logs ----
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---- editor / OS ----
+.DS_Store
+.idea/
+.vscode/
+
+# ---- misc ----
+.vercel/
+*.tsbuildinfo
+next-env.d.ts

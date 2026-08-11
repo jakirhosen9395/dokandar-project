@@ -1,0 +1,30 @@
+# ArgoCD Application — watches manifest-files/ on main and syncs every commit
+# (including the image-tag bumps the CI pipelines push). ConfigMaps/Secrets are
+# NOT in git (jump-server owned) — ArgoCD never sees or prunes them: prune only
+# removes resources ArgoCD itself created from this tree.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dokandar-platform
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: dokandar
+spec:
+  project: default
+  source:
+    repoURL: https://gitlab.com/learningdevopstools/infra/dokandar-k8s-cluster-setup.git
+    targetRevision: main
+    path: manifest-files
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true        # delete cluster resources removed from git
+      selfHeal: true     # revert manual drift back to git state
+    retry:
+      limit: 5
+      backoff: { duration: 20s, factor: 2, maxDuration: 5m }
+    syncOptions:
+      - ApplyOutOfSyncOnly=true
